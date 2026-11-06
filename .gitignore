@@ -1,0 +1,19 @@
+# Generated from household files: aggregates, regional estimates, eval answers
+/data/
+/demo_data/
+evals/results/
+
+# Never in this repository
+*.sav
+*.dta
+*.xlsx
+*.docx
+output/
+.env
+.Renviron
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/

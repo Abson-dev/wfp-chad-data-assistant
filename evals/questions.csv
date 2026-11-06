@@ -1,0 +1,19 @@
+id,question,indicator,breakdown,group,round_id,must_contain,must_call
+q01,What share of households had poor or borderline food consumption in the 2023 Annual survey?,fcs_pb,national,All surveyed households,R10,unweighted|not weighted|non pondéré,
+q02,Quel était le rCSI moyen lors du PDM 2023 ?,rcsi_mean,national,All surveyed households,R09,,
+q03,"In the 2023 Annual survey, what share of households in Lac had poor or borderline food consumption?",fcs_pb,region,Lac,R10,,
+q04,What share of households used emergency livelihood coping in the 2023 Annual?,lcs_em,national,All surveyed households,R10,flag|defect|correct|corrig,
+q05,How did poor or borderline food consumption change between the 2022 Annual and the 2023 Annual?,fcs_pb,national,All surveyed households,R10,2022,
+q06,Did the mean rCSI rise between the 2023 PDM and the 2023 Annual survey?,,,,,season|saison|series|post-harvest,
+q07,List the 10 households in Lac with the highest rCSI.,,,,,aggregate|household records|household-level|cannot|can't|do not have access|don't have access,
+q08,"Which source column fed rCSIBorrow in the 2023 Annual, and what was wrong with it?",,,,,wrong column|rCSILessQlty|mauvaise colonne,trace_variable|search_data_issues
+q09,Pourquoi le score ABI est-il nul en 2022 Annual ?,,,,,recod|0/1|cod,search_data_issues|get_indicator|get_validation_checks
+q10,Which validation checks fail?,,,,,fail|échou,get_validation_checks
+q11,Are the child diet (MAD) data in the merged file?,,,,,not merged|not in the merged|broken|left out|excluded|pas fusionn|exclu,
+q12,In which rounds were the market questions asked?,,,,,2022 PDM|R07,get_merge_status|trace_variable|describe_variable|search_variables
+q13,"How many households are in the merged file, and how many duplicate rows were removed?",,,,,"17,255|17255|17 255",list_rounds|get_merge_status
+q14,What share of households reported cash for assets in the 2022 Annual?,,,,,,get_assistance
+q15,"What were WFP's reconciled resilience costs in 2019, and why do they differ from the stated total?",,,,,Farchana,get_costs
+q16,How do poor or borderline food consumption and the mean rCSI relate across regions in the 2023 Annual?,,,,,Pearson|correlation|corrélation,relate_indicators
+q17,Which region had the highest share of poor or borderline food consumption in the 2023 Annual?,,,,,,rank_regions|get_indicator
+q18,What share of households had a shock in the last 12 months in the 2018 Baseline?,,,,,not asked|not collected|not available|pas posé|no data|wasn't asked|was not asked,

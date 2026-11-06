@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WFP Chad data assistant</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/vendor/vega/vega.min.js"></script>
+  <script src="/static/vendor/vega/vega-interpreter.js"></script>
+  <script src="/static/vendor/vega/vega-lite.min.js"></script>
+  <script src="/static/vendor/vega/vega-embed.min.js"></script>
+</head>
+<body>
+  <form id="lock" class="lock" hidden>
+    <h1>WFP Chad data assistant</h1>
+    <p>Preliminary estimates. Restricted access.</p>
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <button type="submit">Unlock</button>
+    <p id="lock-error" class="error" role="alert"></p>
+  </form>
+
+  <div id="app" class="app" hidden>
+    <aside class="side">
+      <div class="brand"><span class="brand-title">WFP Chad</span><span class="brand-sub">Data assistant</span></div>
+      <button id="new-chat" class="new-chat" type="button">New chat <span aria-hidden="true">+</span></button>
+      <div class="counter"><div><strong>Tool calls</strong><span id="tool-note">None in this chat</span></div><b id="tool-count">0</b></div>
+      <h2 class="side-title">History</h2>
+      <ul id="history" class="history"></ul>
+      <p class="side-foot">Aggregates and metadata only: no household records are sent. Figures are unweighted and preliminary, not official WFP results. AI can make mistakes: check the sources under each answer.</p>
+    </aside>
+
+    <main class="main">
+      <div id="banner" class="banner" role="status" hidden></div>
+      <section id="welcome" class="welcome">
+        <p id="kicker" class="kicker">WFP Chad resilience surveys, 2018–2023</p>
+        <h1>Ask how the data were merged, and what they show.</h1>
+        <p class="lead">A sourced answer, a chart, and the table behind it. English or French.</p>
+        <div id="examples" class="examples"></div>
+      </section>
+      <section id="thread" class="thread" aria-live="polite"></section>
+      <form id="ask" class="ask">
+        <label for="question" class="sr-only">Your question</label>
+        <textarea id="question" rows="2" maxlength="2000" placeholder="Ask about a variable, a round, a region…"></textarea>
+        <button id="send" type="submit">Ask</button>
+      </form>
+    </main>
+  </div>
+  <script src="/static/chart.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
