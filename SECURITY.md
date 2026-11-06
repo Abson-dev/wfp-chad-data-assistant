@@ -2,7 +2,7 @@
 
 ## Reporting a problem
 
-Please report a vulnerability, or any survey data you find in this repository, privately to the maintainer (through GitHub's private vulnerability reporting once the repository is on GitHub), not in a public issue. If a report concerns exposed data, it will also be raised with WFP.
+Please report a vulnerability, or any survey data you find in this repository, privately through [GitHub's private vulnerability reporting](https://github.com/Abson-dev/wfp-chad-data-assistant/security/advisories/new), not in a public issue. If a report concerns exposed data, it will also be raised with WFP.
 
 ## What the design protects
 

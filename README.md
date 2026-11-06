@@ -1,5 +1,7 @@
 # WFP Chad data assistant
 
+[![Tests](https://github.com/Abson-dev/wfp-chad-data-assistant/actions/workflows/tests.yml/badge.svg)](https://github.com/Abson-dev/wfp-chad-data-assistant/actions/workflows/tests.yml)
+
 Ask, in English or French, how the WFP Chad resilience surveys were merged, what is wrong or fixed in them, and what they show. Every answer comes with its table, a chart when it helps, a CSV download and the tool calls behind it.
 
 > *How was rCSIBorrow merged across the rounds, and what was wrong with it?*
