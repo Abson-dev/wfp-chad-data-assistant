@@ -137,6 +137,14 @@
         }
         if (pub.note) r.append(el("p", "note", pub.note));
         r.append(table(pub));
+        // A link back to the dashboard page that holds these figures (http or https only).
+        if (pub.dashboard && /^https?:\/\//.test(pub.dashboard.url)) {
+          const p = el("p", "dashboard-link");
+          const link = el("a", "", `See it in the dashboard: ${pub.dashboard.page} page`);
+          link.href = pub.dashboard.url; link.target = "_blank"; link.rel = "noopener";
+          p.append(link);
+          r.append(p);
+        }
         a.append(r);
       }
       a.append(sources(entry));

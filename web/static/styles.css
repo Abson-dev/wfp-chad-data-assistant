@@ -104,3 +104,7 @@ table.data tbody tr:nth-child(even) td { background: #F8FAFB; }
   .thread, .ask { padding-inline: 1rem; }
   .q { max-width: 92%; }
 }
+
+/* Link back to the dashboard page under a result */
+.dashboard-link { margin: .5rem 0 0; font-size: .85rem; }
+.dashboard-link a { color: var(--teal-dark); font-weight: 600; }

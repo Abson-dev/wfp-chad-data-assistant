@@ -77,6 +77,18 @@ def test_loop_publishes_and_traces():
     assert [c["tool"] for c in a.tool_calls] == ["get_indicator", "publish_result"]
 
 
+def test_every_tool_links_to_a_dashboard_page():
+    for t in tools.TOOLS:
+        if t.name != "publish_result":
+            link = tools.dashboard_link(t.name)
+            assert link and link["url"].startswith("https://") and "#page=" in link["url"], t.name
+
+
+def test_a_published_result_carries_its_dashboard_link():
+    a = scripted([[("get_household_costs", {"view": "by_round"})]]).ask("costs?")
+    assert a.published["dashboard"] == {"page": "Costs", "url": tools.DASHBOARD_URL.split("#")[0] + "#page=costs"}
+
+
 def test_loop_shows_the_only_table_when_nothing_is_published():
     a = scripted([[("trace_variable", {"variable": "HHHSex"})]]).ask("how?")
     assert a.published and a.published["chart"] is None and a.published["row_count"] == 10

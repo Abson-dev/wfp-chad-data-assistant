@@ -126,6 +126,12 @@ def test_table_filter_sort_and_csv(page):
     assert text.count("\n") == 1 and "2018 Baseline" in text
 
 
+def test_result_links_back_to_the_dashboard(page):
+    turn = ask(page, "merged")
+    link = turn.locator(".dashboard-link a")
+    assert link.count() == 1 and "#page=crosswalk" in link.get_attribute("href") and link.get_attribute("rel") == "noopener"
+
+
 def test_sources_list_the_tool_calls(page):
     turn = ask(page, "merged")
     turn.locator(".sources summary").click()

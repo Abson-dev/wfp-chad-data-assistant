@@ -80,6 +80,8 @@ class WfpAgent:
         self.history += [{"role": "user", "content": question}, {"role": "assistant", "content": text or "(no text)"}]
         published = tools.PUBLISHED[0] if tools.PUBLISHED else results.default_publication(
             tools.RESULTS, tools._table("rounds.csv")["round"].tolist(), tools.LIMITS)
+        if published:
+            published = {**published, "dashboard": tools.dashboard_link(published["source"]["tool"])}
         return Answer(text, list(tools.TRACE), n_in, n_out, refused, published)
 
     def reset(self) -> None:

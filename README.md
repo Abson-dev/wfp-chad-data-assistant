@@ -68,6 +68,10 @@ The dashboard's `prepare_app_data.R` is the only step that reads household data.
 
 **Regional aggregates are sent to the Anthropic API when a question needs them. Agree this use with WFP before sharing the assistant.** Chat history stays in the user's browser and can quote regional values.
 
+## Linked with the dashboard
+
+The assistant and the [dashboard](https://abson-dev.shinyapps.io/wfp-chad-data-merging/) share their figures: `build_agent_data.py` reads the dashboard's aggregates, so rebuild the assistant's tables after each dashboard refresh. Each published result links back to the dashboard page that holds it (for example `#page=costs`), which opens after the dashboard's login. The dashboard's About page describes the assistant, and shows an "Ask the assistant" link once it is hosted (`WFP_ASSISTANT_URL` on the dashboard's server).
+
 ## Three ways to use it
 
 | Way | Needs | For |
@@ -122,6 +126,7 @@ On a server, always set a password and put HTTPS in front of it: `APP_PASSWORD=.
 | `WFP_AGENT_MODEL` | `claude-opus-5-5` | Model |
 | `WFP_AGENT_EFFORT` | `high` | `low` to `max`; `medium` costs less and is often enough for look-ups |
 | `WFP_AGENT_DATA` | `data/` | Folder of the tables |
+| `WFP_DASHBOARD_URL` | `https://abson-dev.shinyapps.io/wfp-chad-data-merging/` | The dashboard each result links back to (`#page=...`); empty for no link |
 | `WFP_DASHBOARD_APP` | `../WFP_Chad_Cost_Benefit_Analysis_data_merging/app` | The dashboard folder the build reads |
 
 The instructions and tool definitions are cached between questions. `ask.py` prints the tokens used; see the [current prices](https://www.anthropic.com/pricing).

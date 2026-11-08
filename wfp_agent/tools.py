@@ -29,6 +29,23 @@ PUBLISHED: list[dict] = []
 ON_EVENT: list[Callable[[dict], None]] = []
 MAX_ROWS = LIMITS["max_rows_to_model"]
 FIGURES = ("as_merged", "with_corrections")
+# Links back to the dashboard: the page that holds the figures of each tool (#page=... opens it, even after the login).
+DASHBOARD_URL = os.environ.get("WFP_DASHBOARD_URL", "https://abson-dev.shinyapps.io/wfp-chad-data-merging/")
+DASHBOARD_PAGES = {
+    "list_indicators": ("data", "Data"), "list_rounds": ("rounds", "Rounds"), "get_indicator": ("trends", "Trends"),
+    "compare_rounds": ("trends", "Trends"), "rank_regions": ("regions", "Regions"), "relate_indicators": ("regions", "Regions"),
+    "get_assistance": ("assistance", "Assistance"), "get_costs": ("costs", "Costs"), "get_household_costs": ("costs", "Costs"),
+    "trace_variable": ("crosswalk", "Crosswalk"), "describe_variable": ("variables", "Variables"), "search_variables": ("variables", "Variables"),
+    "get_merge_status": ("merge", "Merge"), "get_validation_checks": ("validation", "Validation"), "search_data_issues": ("issues", "Data issues"),
+}
+
+
+def dashboard_link(tool: str) -> dict | None:
+    """The dashboard page that shows what a tool returned, or None when there is no dashboard address."""
+    if tool not in DASHBOARD_PAGES or not DASHBOARD_URL.startswith(("https://", "http://")):
+        return None
+    slug, page = DASHBOARD_PAGES[tool]
+    return {"page": page, "url": f"{DASHBOARD_URL.split('#')[0]}#page={slug}"}
 
 
 def begin_question(on_event: Callable[[dict], None] | None = None) -> None:
