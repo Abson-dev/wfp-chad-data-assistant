@@ -17,3 +17,7 @@ q15,"What were WFP's reconciled resilience costs in 2019, and why do they differ
 q16,How do poor or borderline food consumption and the mean rCSI relate across regions in the 2023 Annual?,,,,,Pearson|correlation|corrélation,relate_indicators
 q17,Which region had the highest share of poor or borderline food consumption in the 2023 Annual?,,,,,,rank_regions|get_indicator
 q18,What share of households had a shock in the last 12 months in the 2018 Baseline?,,,,,not asked|not collected|not available|pas posé|no data|wasn't asked|was not asked,
+q19,What was the mean cost of WFP's assistance per household in the 2023 Annual survey?,,,,,XAF|FCFA,get_household_costs
+q20,How is the community cost of cash for assets assigned to a household that did not take part?,,,,,capacity,get_household_costs|search_data_issues
+q21,Why might the capacity cost be overstated for some households?,,,,,repeat|copied|copie|beneficiar|bénéficiaire,get_household_costs|search_data_issues
+q22,Is every franc of the community cost template accounted for?,,,,,ledger|destination|grand livre,get_household_costs

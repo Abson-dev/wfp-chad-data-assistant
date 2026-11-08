@@ -113,6 +113,38 @@ def test_costs_tables(rows):
     assert "No cost rows" in tools.get_costs.call({"table": "category", "year": "1999"})
 
 
+def test_household_costs_every_view(rows):
+    for view in tools.HOUSEHOLD_COST_VIEWS:
+        t, text = rows(tools.get_household_costs, view=view)
+        assert len(t) and "XAF" in text
+    assert "view must be one of" in tools.get_household_costs.call({"view": "nope"})
+
+
+def test_household_costs_by_round_add_up(rows):
+    t, _ = rows(tools.get_household_costs, view="by_round")
+    assert (t["source_village"] + t["source_area"] + t["source_none"] + t["source_unknown"] == t["households"]).all()
+    assert (t["with_total"] == t["households"] - t["source_unknown"]).all()
+    assert "R01" not in set(t["round_id"])  # no cost before the programme years
+
+
+def test_household_costs_filters(rows):
+    t, _ = rows(tools.get_household_costs, view="items", round_id="R10", keyword="LEAN")
+    assert set(t["round_id"]) == {"R10"} and t["label"].str.lower().str.contains("lean").all()
+    assert "No rows" in tools.get_household_costs.call({"view": "items", "keyword": "zzz-none"})
+
+
+def test_household_cost_cells_under_30_are_hidden(rows):
+    items, _ = rows(tools.get_household_costs, view="items")
+    assert items.loc[items["recipients"] < 30, "mean_if_recipient"].isna().all()
+    region, _ = rows(tools.get_household_costs, view="region")
+    assert region.loc[region["households"] < 30, "total_mean"].isna().all()
+
+
+def test_programme_costs_include_partners(rows):
+    t, _ = rows(tools.get_costs, table="partner")
+    assert {"partner", "cash_xaf"} <= set(t.columns)
+
+
 # ---- Merging process ----------------------------------------------------------------------------------------
 
 def test_trace_gives_every_round_and_the_agreement(rows):

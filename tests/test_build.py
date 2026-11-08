@@ -53,7 +53,7 @@ def test_a_household_column_stops_the_build(tmp_path):
     f = app / "demo_data" / "checks.csv"
     pd.read_csv(f).assign(Latitude=12.1).to_csv(f, index=False)
     with pytest.raises(SystemExit, match="Household-level column"):
-        b.build(app, tmp_path / "out", demo=True, catalogue_csv=app / "indicator_catalog.csv")
+        b.build(app, tmp_path / "out", demo=True, catalogue_csv=app / "indicator_catalog.csv", costs_dir=app / "costs")
     assert not (tmp_path / "out").exists()
 
 
@@ -63,7 +63,7 @@ def test_a_missing_table_asks_for_a_rerun(tmp_path):
     shutil.copytree(app_dir, app)
     (app / "demo_data" / "merge_steps.csv").unlink()
     with pytest.raises(SystemExit, match="prepare_app_data.R"):
-        b.build(app, tmp_path / "out", demo=True, catalogue_csv=app / "indicator_catalog.csv")
+        b.build(app, tmp_path / "out", demo=True, catalogue_csv=app / "indicator_catalog.csv", costs_dir=app / "costs")
 
 
 def test_tables_have_no_household_columns():
@@ -73,7 +73,8 @@ def test_tables_have_no_household_columns():
 
 
 def test_every_table_the_tools_read_is_built():
-    for name in [*b.COPY.values(), "rounds.csv", "indicators.csv", "indicator_catalog.csv", "issues.csv", "modules.csv", "interventions.csv"]:
+    for name in [*b.COPY.values(), *b.COST_RULES.values(), "rounds.csv", "indicators.csv", "indicator_catalog.csv", "issues.csv", "modules.csv",
+                 "interventions.csv"]:
         assert (tools.DATA / name).exists(), name
     assert (tools.DATA / "build_info.json").exists()
 

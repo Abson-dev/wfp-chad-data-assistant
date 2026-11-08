@@ -1,6 +1,6 @@
 ---
 name: wfp-chad-data
-description: Answer questions about the merged WFP Chad resilience surveys (10 rounds, 2018 Baseline to 2023 Annual, 17,255 households) and how they were merged. Use for FCS, rCSI, LCS, HDDS, ABI, shocks, assets, markets and the other 2026 modules by round or region; for how a variable was merged, its source column and agreement with the raw value; for validation checks and data issues; and for WFP interventions and programme costs.
+description: Answer questions about the merged WFP Chad resilience surveys (10 rounds, 2018 Baseline to 2023 Annual, 17,255 households) and how they were merged. Use for FCS, rCSI, LCS, HDDS, ABI, shocks, assets, markets and the other 2026 modules by round or region; for how a variable was merged, its source column and agreement with the raw value; for validation checks and data issues; for WFP interventions and programme costs; and for the cost of WFP's assistance per household (community costs by asset type, household-level interventions, the ledger and the cost rules).
 metadata:
   version: "0.1.0"
 ---
@@ -22,6 +22,9 @@ python wfp_cli.py search_data_issues keyword=coping
 python wfp_cli.py get_indicator indicator=fcs_pb rounds="R08,R10"
 python wfp_cli.py rank_regions indicator=shk_any12m round_id=R10
 python wfp_cli.py get_costs table=reconciliation
+python wfp_cli.py get_household_costs view=by_round round_id=R10
+python wfp_cli.py get_household_costs view=items keyword=lean
+python wfp_cli.py get_household_costs view=ledger
 ```
 
 The tables come from `python build_agent_data.py`, which reads the dashboard data of the merging repository. If a tool says a table is missing, ask the user to rerun the dashboard's `prepare_app_data.R` and then the build.

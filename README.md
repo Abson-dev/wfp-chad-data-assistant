@@ -2,15 +2,17 @@
 
 [![Tests](https://github.com/Abson-dev/wfp-chad-data-assistant/actions/workflows/tests.yml/badge.svg)](https://github.com/Abson-dev/wfp-chad-data-assistant/actions/workflows/tests.yml)
 
-Ask, in English or French, how the WFP Chad resilience surveys were merged, what is wrong or fixed in them, and what they show. Every answer comes with its table, a chart when it helps, a CSV download and the tool calls behind it.
+Ask, in English or French, how the WFP Chad resilience surveys were merged, what is wrong or fixed in them, what they show, and what WFP's assistance cost per household. Every answer comes with its table, a chart when it helps, a CSV download and the tool calls behind it.
 
 > *How was rCSIBorrow merged across the rounds, and what was wrong with it?*
 >
 > *Which validation checks fail, and which data issues are still open?*
 >
 > *Quelles régions ont le plus souffert de chocs au cours des 12 derniers mois en 2023 ?*
+>
+> *What did WFP's assistance cost per household in the 2023 Annual survey, and how is it built?*
 
-It is the AI companion of the [WFP Chad data merging repository](https://github.com/Abson-dev/WFP_Chad_Cost_Benefit_Analysis_data_merging), which merges 10 household survey rounds of WFP's Integrated Resilience Programme in Chad (the 2018 baseline to the 2023 annual survey, 17,255 households) for IFPRI's cost-benefit analysis. It reads the aggregates that the repository's dashboard already publishes. This repository holds code and documentation only. The survey data belong to WFP and are not here.
+It is the AI companion of the [WFP Chad data merging repository](https://github.com/Abson-dev/WFP_Chad_Cost_Benefit_Analysis_data_merging), which merges 10 household survey rounds of WFP's Integrated Resilience Programme in Chad (the 2018 baseline to the 2023 annual survey, 17,255 households) for IFPRI's cost-benefit analysis, and adds the cost of WFP's assistance to each household (merged file v6, 670 columns). It reads the aggregates that the repository's dashboard already publishes. This repository holds code and documentation only. The survey data belong to WFP and are not here.
 
 > **Status: tested offline, not yet with the live model.** The tools, the build, the web app and the security rules are tested, on invented data and on the real tables. The quality of the model's own answers is not: run [the evals](#test-it) before relying on it.
 
@@ -45,7 +47,7 @@ Everything built from the invented dashboard is labelled synthetic, in the tools
 flowchart LR
   A["Merged file<br/>(17,255 households)"] -->|"prepare_app_data.R<br/>(dashboard, runs locally)"| B["Dashboard aggregates<br/>cells under 30 suppressed"]
   B -->|"build_agent_data.py"| C["data/<br/>aggregates and metadata"]
-  C --> D["15 read-only tools"]
+  C --> D["16 read-only tools"]
   D <--> E["Claude"]
   D -->|"publish_result:<br/>checked by the server"| F["Chart, table, CSV,<br/>sources"]
   E --> F
@@ -87,7 +89,8 @@ Anyone can run the tools directly with `python wfp_cli.py`, with no API key.
 | | `get_validation_checks`, `search_data_issues` | The dashboard's checks (pass, warn, fail) and the documented data issues |
 | **The analysis** | `list_rounds`, `list_indicators`, `get_indicator`, `compare_rounds` | 55 indicators by round, national or by region, as merged and with corrections |
 | | `rank_regions`, `relate_indicators` | Regions against all surveyed households; two indicators across regions, with correlations |
-| **The programme** | `get_assistance`, `get_costs` | The WFP interventions households report; WFP's reconciled resilience costs (XAF) |
+| **The programme** | `get_assistance`, `get_costs` | The WFP interventions households report; WFP's reconciled resilience costs (XAF) by period, activity, area and partner |
+| **Costs per household** | `get_household_costs` | The 44 cost variables of the merged file as aggregates: by round (and the source of the community cost), by intervention, by asset type, by region; the ledger of the community template; the template against WFP's revised workbook; unit costs, exchange rates and the dictionary of the cost variables |
 | **The reader** | `publish_result` | The checked table and chart under the answer |
 
 **It cannot:** weight the figures, give confidence intervals or significance tests, go below the region, compute a new indicator, or see a household. Correlations describe regions, not households. Child (MAD) and women's (MDD-W) diet data are not in the merged file. It says so rather than guess.

@@ -135,9 +135,10 @@ def test_tool_events_reach_the_listener():
 
 
 def test_the_instructions_name_every_merge_tool_and_cover_the_cautions():
-    for name in ("trace_variable", "describe_variable", "get_merge_status", "search_data_issues", "get_validation_checks", "publish_result"):
+    for name in ("trace_variable", "describe_variable", "get_merge_status", "search_data_issues", "get_validation_checks", "get_household_costs",
+                 "publish_result"):
         assert name in SYSTEM
-    for caution in ("Never estimate", "significant", "unweighted", "lean season", "flagged", "WFP's agreement"):
+    for caution in ("Never estimate", "significant", "unweighted", "lean season", "flagged", "WFP's agreement", "Never name a village", "missing, not zero"):
         assert caution in SYSTEM
 
 

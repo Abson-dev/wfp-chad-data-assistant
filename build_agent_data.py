@@ -49,9 +49,20 @@ COPY = {
     "cost_by_category.csv": "cost_by_category.csv",
     "cost_by_area.csv": "cost_by_area.csv",
     "cost_survey_link.csv": "cost_survey_link.csv",
+    "cost_by_partner.csv": "cost_by_partner.csv",
+    # Costs per household (do-file 21 of the merging repository), as the dashboard aggregates them.
+    "cost_household_by_round.csv": "cost_household_by_round.csv",
+    "cost_household_items.csv": "cost_household_items.csv",
+    "cost_household_assets.csv": "cost_household_assets.csv",
+    "cost_household_region.csv": "cost_household_region.csv",
+    "cost_ledger.csv": "cost_ledger.csv",
+    "cost_template_vs_revised.csv": "cost_template_vs_revised.csv",
     "nutrition_rows.csv": "nutrition_rows.csv",
     "ch_phase_by_round.csv": "ch_phase_by_round.csv",
 }
+# Rules of the cost process, from the merging repository's costs/ folder (parameters, no household data).
+COST_RULES = {"cost_variables.csv": "cost_variables.csv", "household_unit_costs.csv": "cost_unit_costs.csv", "exchange_rates.csv": "cost_exchange_rates.csv",
+              "department_crosswalk.csv": "cost_department_crosswalk.csv"}
 ROUND_COLS = ["round_id", "round_no", "round", "year", "survey", "series", "final_rows", "raw_rows", "duplicates_removed", "empty_removed",
               "date_p01", "date_p99", "regions", "departments", "raw_file"]
 
@@ -101,8 +112,10 @@ def boundary_check(folder: Path) -> None:
             raise SystemExit(f"Household-level column {sorted(bad)} in {f.name}: refusing to build.")
 
 
-def build(app: Path, out: Path, demo: bool = False, catalogue_csv: Path | None = None) -> dict:
-    """app: the dashboard's app/ folder (data/ or demo_data/, config/, R/utils.R). catalogue_csv skips Rscript."""
+def build(app: Path, out: Path, demo: bool = False, catalogue_csv: Path | None = None, costs_dir: Path | None = None) -> dict:
+    """app: the dashboard's app/ folder (data/ or demo_data/, config/, R/utils.R). catalogue_csv skips Rscript.
+    costs_dir: the merging repository's costs/ folder (default: next to app/)."""
+    costs_dir = costs_dir or app.parent / "costs"
     app_data = app / ("demo_data" if demo else "data")
     if not app_data.exists():
         raise SystemExit(f"{app_data} not found. Run the dashboard's prepare_app_data.R first.")
@@ -124,15 +137,21 @@ def build(app: Path, out: Path, demo: bool = False, catalogue_csv: Path | None =
         indicators_long(app_data, catalogue, rounds, pd.read_csv(app_data / "flags.csv")).to_csv(tmp / "indicators.csv", index=False)
         for cfg in ("issues.csv", "modules.csv", "interventions.csv"):
             shutil.copy(app / "config" / cfg, tmp / cfg)
+        for name, new in COST_RULES.items():
+            if not (costs_dir / name).exists():
+                raise SystemExit(f"{costs_dir / name} not found: the merging repository is older than this assistant.")
+            shutil.copy(costs_dir / name, tmp / new)
         manifest = json.loads((app_data / "manifest.json").read_text(encoding="utf-8"))
         keep = ("merged_file", "households", "columns", "min_cell", "mapped_variables", "mapped_variables_extension", "modules_2025", "modules_2026")
         info = {"built_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), "synthetic": bool(demo),
                 "dashboard_run": manifest.get("run_utc"), **{k: manifest.get(k) for k in keep}}
         (tmp / "build_info.json").write_text(json.dumps(info, indent=2), encoding="utf-8")
         boundary_check(tmp)
-        if out.exists():
-            shutil.rmtree(out)
-        shutil.copytree(tmp, out)
+        # Empty the folder rather than delete it: OneDrive and open editors can lock a folder, not its files.
+        out.mkdir(parents=True, exist_ok=True)
+        for f in out.iterdir():
+            shutil.rmtree(f) if f.is_dir() else f.unlink()
+        shutil.copytree(tmp, out, dirs_exist_ok=True)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return info

@@ -295,17 +295,18 @@ def get_assistance(variable: str = "", round_id: str = "", breakdown: str = "nat
 
 @beta_tool
 def get_costs(table: str = "reconciliation", year: str = "") -> str:
-    """WFP's resilience costs (XAF), as reconciled in the merging repository. Tables: reconciliation (stated against
-    reconciled totals by period), category (by activity category and assistance type), area (by cost area and region),
-    survey_link (costs linked to the surveyed households by department and year).
+    """WFP's resilience costs (XAF) in WFP's revised workbook, as reconciled in the merging repository: programme-level
+    tables, not per household (for that, use get_household_costs). Tables: reconciliation (stated against reconciled
+    totals by period), category (by activity category and assistance type), area (by cost area and region), partner
+    (by implementing partner and year), survey_link (costs linked to the surveyed households by department and year).
 
     Args:
-        table: reconciliation, category, area or survey_link.
+        table: reconciliation, category, area, partner or survey_link.
         year: Optional year or period filter, e.g. "2022".
     """
     call = _log("get_costs", table=table, year=year)
     names = {"reconciliation": "cost_reconciliation.csv", "category": "cost_by_category.csv", "area": "cost_by_area.csv",
-             "survey_link": "cost_survey_link.csv"}
+             "partner": "cost_by_partner.csv", "survey_link": "cost_survey_link.csv"}
     if table not in names:
         return f"table must be one of {', '.join(names)}."
     t = _table(names[table])
@@ -313,6 +314,55 @@ def get_costs(table: str = "reconciliation", year: str = "") -> str:
         col = "year" if "year" in t.columns else "period"
         t = t[t[col].astype(str).str.contains(year.strip(), regex=False)]
     return _result(t, call, f"Costs: {table}{' ' + year if year else ''}") if len(t) else f"No cost rows for '{year}'."
+
+
+HOUSEHOLD_COST_VIEWS = {
+    "by_round": ("cost_household_by_round.csv", "Cost per household by round: households, community cost source (village, cost area, none, "
+                 "unknown), mean transfer, capacity, intervention and total cost (XAF, over households with a cost), median total"),
+    "items": ("cost_household_items.csv", "Cost by intervention and round: households asked, recipients, mean cost per recipient (XAF; "
+              "hidden under 30 recipients), total"),
+    "assets": ("cost_household_assets.csv", "Community cost by asset type and round: mean per household with a community cost (XAF)"),
+    "region": ("cost_household_region.csv", "Cost per household by region and round: mean and median total, community and intervention "
+               "means (XAF; hidden under 30 households)"),
+    "ledger": ("cost_ledger.csv", "Ledger of IFPRI's community template: where every franc goes, by period and destination"),
+    "template_vs_revised": ("cost_template_vs_revised.csv", "Community template (transfer, capacity) against WFP's revised workbook, by period"),
+    "unit_costs": ("cost_unit_costs.csv", "Unit cost, currency, unit rule and months of each household-level intervention, with its status"),
+    "exchange_rates": ("cost_exchange_rates.csv", "XAF per USD by year (World Bank, official rate, annual average)"),
+    "variables": ("cost_variables.csv", "Dictionary of the 44 cost variables of the merged file: group, unit, source and rule"),
+}
+
+
+@beta_tool
+def get_household_costs(view: str = "by_round", round_id: str = "", keyword: str = "") -> str:
+    """The cost of WFP's assistance per household: the 44 cost variables added to the merged file by do-file 21, as the
+    dashboard aggregates them, and the rules that built them. Views:
+    by_round (means and sources of the community cost), items (by intervention), assets (community cost by asset type),
+    region (by region), ledger (where every franc of the community template goes), template_vs_revised (the two cost
+    files compared), unit_costs (unit costs and rules), exchange_rates, variables (dictionary of the cost variables).
+
+    Args:
+        view: One of by_round, items, assets, region, ledger, template_vs_revised, unit_costs, exchange_rates, variables.
+        round_id: Optional round, e.g. "R10" (by_round, items, assets, region).
+        keyword: Optional word to filter rows, e.g. "lean", "school", "water", "capacity" (accents ignored).
+    """
+    call = _log("get_household_costs", view=view, round_id=round_id, keyword=keyword)
+    if view not in HOUSEHOLD_COST_VIEWS:
+        return f"view must be one of {', '.join(HOUSEHOLD_COST_VIEWS)}."
+    name, title = HOUSEHOLD_COST_VIEWS[view]
+    t = _table(name)
+    if round_id and "round_id" in t.columns:
+        rid = _round_ids(round_id)
+        t = t[t["round_id"].isin(rid)]
+    if keyword:
+        want = _plain(keyword)
+        t = t[t.apply(lambda r: want in _plain(" ".join(r.astype(str))), axis=1)]
+    if t.empty:
+        return f"No rows in {view} for round '{round_id}' and keyword '{keyword}'."
+    if "round_id" in t.columns:
+        t = _table("rounds.csv")[["round_id", "round"]].merge(t, on="round_id")
+    head = ("# Costs per household come from IFPRI's community and household templates and WFP's cost data (merging repository, "
+            "costs/). XAF. Unweighted. See the cost rules in your instructions.\n")
+    return _result(t, call, title, head)
 
 
 # ---- Merging process -----------------------------------------------------------------------------
@@ -528,6 +578,6 @@ def build_info() -> dict:
     return json.loads((DATA / "build_info.json").read_text(encoding="utf-8"))
 
 
-TOOLS = [list_indicators, list_rounds, get_indicator, compare_rounds, rank_regions, relate_indicators, get_assistance, get_costs,
+TOOLS = [list_indicators, list_rounds, get_indicator, compare_rounds, rank_regions, relate_indicators, get_assistance, get_costs, get_household_costs,
          trace_variable, describe_variable, search_variables, get_merge_status, get_validation_checks, search_data_issues,
          publish_result]
