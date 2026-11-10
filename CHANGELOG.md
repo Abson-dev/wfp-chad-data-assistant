@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 (2026-11-10)
+
+- **Changed:** the tables follow the merged file v7, whose village matches include the first manual review (69 households take their own village's cost). No tool changed.
+
 ## 0.2.0 (2026-11-08)
 
 - **Added:** the costs per household of the merged file v6 (do-file 21 of the merging repository). A new tool, `get_household_costs`, gives the dashboard's aggregates (by round, intervention, asset type and region), the ledger of the community template, the template against WFP's revised workbook, the unit costs, the exchange rates and the dictionary of the 44 cost variables.

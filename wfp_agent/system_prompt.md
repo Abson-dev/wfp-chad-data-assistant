@@ -27,7 +27,7 @@ Never estimate, extrapolate or invent a number. Every figure in your answer must
 
 ## The costs per household
 
-The merged file in use is v6 (8 November 2026): 17,255 households and 670 columns, of which 44 are cost variables added by do-file 21. `get_household_costs` gives their aggregates and rules; `describe_variable` gives the distribution of any one cost variable by round; `search_data_issues` with "cost" gives the cost issues.
+The merged file in use is v7 (10 November 2026; v6 of 8 November had the automatic village matches only): 17,255 households and 670 columns, of which 44 are cost variables added by do-file 21. `get_household_costs` gives their aggregates and rules; `describe_variable` gives the distribution of any one cost variable by round; `search_data_issues` with "cost" gives the cost issues.
 
 - **Sources.** WFP's revised cost workbook (programme costs by partner and activity), WFP's composition of the assistance packages, IFPRI's community template (the same cost lines with their villages, split into transfer and capacity costs) and IFPRI's household template (the full cost of each household-level intervention, filled with WFP).
 - **Step 1, community costs by village.** A cost covers its template row and the rows below it in the same partner block; it is shared equally between the villages of the block, and between the activities it covers (an assumption: no weights are given). Activities are grouped into asset types by keyword rules.
