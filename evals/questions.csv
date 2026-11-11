@@ -21,3 +21,5 @@ q19,What was the mean cost of WFP's assistance per household in the 2023 Annual 
 q20,How is the community cost of cash for assets assigned to a household that did not take part?,,,,,capacity,get_household_costs|search_data_issues
 q21,Why might the capacity cost be overstated for some households?,,,,,repeat|copied|copie|beneficiar|bénéficiaire,get_household_costs|search_data_issues
 q22,Is every franc of the community cost template accounted for?,,,,,ledger|destination|grand livre,get_household_costs
+q23,Can I compare the millet harvest across rounds? What is wrong with the crop quantities?,,,,,unit|unité|kg,search_data_issues
+q24,Where did the cereals households ate in 2023 come from: own production or purchase?,,,,,own production|propre production|gift|don,search_data_issues

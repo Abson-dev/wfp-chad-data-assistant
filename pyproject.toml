@@ -1,6 +1,6 @@
 [project]
 name = "wfp-chad-data-assistant"
-version = "0.2.1"
+version = "0.3.0"
 description = "AI assistant for the merged WFP Chad resilience surveys: how the data were merged, what is wrong or fixed in them, and what they show."
 readme = "README.md"
 requires-python = ">=3.11"

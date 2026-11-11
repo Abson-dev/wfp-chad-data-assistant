@@ -12,7 +12,7 @@ Ask, in English or French, how the WFP Chad resilience surveys were merged, what
 >
 > *What did WFP's assistance cost per household in the 2023 Annual survey, and how is it built?*
 
-It is the AI companion of the [WFP Chad data merging repository](https://github.com/Abson-dev/WFP_Chad_Cost_Benefit_Analysis_data_merging), which merges 10 household survey rounds of WFP's Integrated Resilience Programme in Chad (the 2018 baseline to the 2023 annual survey, 17,255 households) for IFPRI's cost-benefit analysis, and adds the cost of WFP's assistance to each household (merged file v7, 670 columns). It reads the aggregates that the repository's dashboard already publishes. This repository holds code and documentation only. The survey data belong to WFP and are not here.
+It is the AI companion of the [WFP Chad data merging repository](https://github.com/Abson-dev/WFP_Chad_Cost_Benefit_Analysis_data_merging), which merges 10 household survey rounds of WFP's Integrated Resilience Programme in Chad (the 2018 baseline to the 2023 annual survey, 17,255 households) for IFPRI's cost-benefit analysis, and adds the cost of WFP's assistance to each household (merged file v8, 739 columns, with crop production and sales and the sources of the food eaten). It reads the aggregates that the repository's dashboard already publishes. This repository holds code and documentation only. The survey data belong to WFP and are not here.
 
 > **Status: tested offline, not yet with the live model.** The tools, the build, the web app and the security rules are tested, on invented data and on the real tables. The quality of the model's own answers is not: run [the evals](#test-it) before relying on it.
 
@@ -149,7 +149,7 @@ python evals/run_evals.py              # asks the model each question and grades
 | `tests/test_publish_and_loop.py` | Chart checks and the agent loop, through the real tools with [scripted replies](tests/scripted_model.py) | Scripted |
 | `tests/test_web.py` | Streaming, password, sessions, limits, startup rule | Scripted |
 | `tests/test_browser.py` | The client in real Chrome under the production security policy: every chart type, injected HTML, CSV, history, phone width | Scripted |
-| `evals/run_evals.py` | 18 questions: the right number (± 0.15), the expected caveats, the right tools | **Live** |
+| `evals/run_evals.py` | 24 questions: the right number (± 0.15), the expected caveats, the right tools | **Live** |
 
 Only the evals say how good the model's answers are. A full run makes paid API calls, once per question plus its tool rounds. Run them after any change to [the instructions](wfp_agent/system_prompt.md) or the tools.
 

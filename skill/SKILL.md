@@ -1,6 +1,6 @@
 ---
 name: wfp-chad-data
-description: Answer questions about the merged WFP Chad resilience surveys (10 rounds, 2018 Baseline to 2023 Annual, 17,255 households) and how they were merged. Use for FCS, rCSI, LCS, HDDS, ABI, shocks, assets, markets and the other 2026 modules by round or region; for how a variable was merged, its source column and agreement with the raw value; for validation checks and data issues; for WFP interventions and programme costs; and for the cost of WFP's assistance per household (community costs by asset type, household-level interventions, the ledger and the cost rules).
+description: Answer questions about the merged WFP Chad resilience surveys (10 rounds, 2018 Baseline to 2023 Annual, 17,255 households) and how they were merged. Use for FCS, rCSI, LCS, HDDS, ABI, shocks, assets, markets, crop production and sales, food sources and the other 2026 modules by round or region; for how a variable was merged, its source column and agreement with the raw value; for validation checks and data issues; for WFP interventions and programme costs; and for the cost of WFP's assistance per household (community costs by asset type, household-level interventions, the ledger and the cost rules).
 metadata:
   version: "0.1.0"
 ---

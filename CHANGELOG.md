@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 (2026-11-11)
+
+- **Added:** the merged file v8: crop production and sales (`Crp*`) and the sources of the food eaten (`Fsr*`), from do-file 22 of the merging repository, with four new indicators and seven new data issues.
+- **Changed:** the instructions ask the model to check the issue register before reporting any figure or variable, and state the issues that bear on it. They describe the crop and food-source caveats.
+- **Added:** two eval questions on the crop units and the food sources.
+
 ## 0.2.1 (2026-11-10)
 
 - **Changed:** the tables follow the merged file v7, whose village matches include the first manual review (69 households take their own village's cost). No tool changed.
