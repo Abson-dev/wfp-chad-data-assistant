@@ -146,7 +146,8 @@ def create_app(password: str = "", agent_factory: Callable = default_agent_facto
                 agent.history = clean_history(body.history)
                 a = agent.ask(question, on_event=events.put)
                 events.put({"type": "answer", "text": a.text, "published": a.published, "tool_calls": a.tool_calls,
-                            "input_tokens": a.input_tokens, "output_tokens": a.output_tokens, "refused": a.refused})
+                            "input_tokens": a.input_tokens, "output_tokens": a.output_tokens, "refused": a.refused,
+                            "grounding": a.grounding, "provenance": a.provenance, "tool_outputs": a.tool_outputs})
             except Exception as e:  # shown to the user, without internals
                 events.put({"type": "error", "message": friendly_error(e)})
             finally:

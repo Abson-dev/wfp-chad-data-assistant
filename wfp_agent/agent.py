@@ -9,7 +9,7 @@ from pathlib import Path
 
 import anthropic
 
-from . import results, tools
+from . import __version__, grounding, results, tools
 
 MODEL = os.environ.get("WFP_AGENT_MODEL", "claude-opus-5-5")
 # Claude Opus 5.5 defaults to medium effort; set it explicitly. Thinking is adaptive (always on for this model).
@@ -25,6 +25,11 @@ class Answer:
     output_tokens: int = 0
     refused: bool = False
     published: dict | None = None
+    # Which figures of the answer were found in the tool results (grounding.check).
+    grounding: dict = field(default_factory=lambda: {"checked": 0, "unverified": [], "ok": True})
+    # What produced the answer: model, effort and the version of the data, for the downloadable trace.
+    provenance: dict = field(default_factory=dict)
+    tool_outputs: list[str] = field(default_factory=list)
 
 
 class WfpAgent:
@@ -76,13 +81,29 @@ class WfpAgent:
             elif timed_out or last.stop_reason == "tool_use":
                 # A question that uses up its time or its tool rounds says so rather than end on nothing.
                 text = (text + "\n\n[Stopped at the limit for one question: narrow it and ask again.]").strip()
+        # Every figure of the answer must come from this question's tool results, the earlier turns or the instructions.
+        earlier = [m["content"] for m in self.history if isinstance(m.get("content"), str)]
+        checked = {"checked": 0, "unverified": [], "ok": True}
+        if text and not refused:
+            checked = grounding.check(text, list(tools.OUTPUTS) + [question, SYSTEM] + earlier)
         # Keep only the question and the final answer in the history (append-only).
         self.history += [{"role": "user", "content": question}, {"role": "assistant", "content": text or "(no text)"}]
         published = tools.PUBLISHED[0] if tools.PUBLISHED else results.default_publication(
             tools.RESULTS, tools._table("rounds.csv")["round"].tolist(), tools.LIMITS)
         if published:
             published = {**published, "dashboard": tools.dashboard_link(published["source"]["tool"])}
-        return Answer(text, list(tools.TRACE), n_in, n_out, refused, published)
+        return Answer(text, list(tools.TRACE), n_in, n_out, refused, published, checked, provenance(),
+                      list(tools.OUTPUTS))
 
     def reset(self) -> None:
         self.history.clear()
+
+
+def provenance() -> dict:
+    """The model and the data behind an answer, so that a reader can see what produced it and rebuild it."""
+    try:
+        info = tools.build_info()
+    except FileNotFoundError:
+        info = {}
+    keep = ("merged_file", "built_at", "dashboard_run", "synthetic", "households", "columns")
+    return {"model": MODEL, "effort": EFFORT, "agent_version": __version__, "data": {k: info[k] for k in keep if k in info}}

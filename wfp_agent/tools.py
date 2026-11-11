@@ -12,7 +12,7 @@ import os
 import re
 import unicodedata
 from collections.abc import Callable
-from functools import cache
+from functools import cache, wraps
 from pathlib import Path
 
 import pandas as pd
@@ -24,6 +24,8 @@ AGENT_DIR = Path(__file__).resolve().parents[1]
 DATA = Path(os.environ.get("WFP_AGENT_DATA", AGENT_DIR / "data"))
 LIMITS = json.loads((AGENT_DIR / "limits.json").read_text(encoding="utf-8"))
 TRACE: list[dict] = []
+# What each tool returned to the model in this question: the sources of the answer's figures (see grounding.py).
+OUTPUTS: list[str] = []
 RESULTS: dict[str, dict] = {}
 PUBLISHED: list[dict] = []
 ON_EVENT: list[Callable[[dict], None]] = []
@@ -33,7 +35,8 @@ FIGURES = ("as_merged", "with_corrections")
 DASHBOARD_URL = os.environ.get("WFP_DASHBOARD_URL", "https://abson-dev.shinyapps.io/wfp-chad-data-merging/")
 DASHBOARD_PAGES = {
     "list_indicators": ("data", "Data"), "list_rounds": ("rounds", "Rounds"), "get_indicator": ("trends", "Trends"),
-    "compare_rounds": ("trends", "Trends"), "rank_regions": ("regions", "Regions"), "relate_indicators": ("regions", "Regions"),
+    "compare_rounds": ("trends", "Trends"), "profile_indicator": ("trends", "Trends"),
+    "rank_regions": ("regions", "Regions"), "relate_indicators": ("regions", "Regions"),
     "get_assistance": ("assistance", "Assistance"), "get_costs": ("costs", "Costs"), "get_household_costs": ("costs", "Costs"),
     "trace_variable": ("crosswalk", "Crosswalk"), "describe_variable": ("variables", "Variables"), "search_variables": ("variables", "Variables"),
     "get_merge_status": ("merge", "Merge"), "get_validation_checks": ("validation", "Validation"), "search_data_issues": ("issues", "Data issues"),
@@ -51,9 +54,20 @@ def dashboard_link(tool: str) -> dict | None:
 def begin_question(on_event: Callable[[dict], None] | None = None) -> None:
     """Forget the tool calls and results of the previous question. The agent runs one question at a time."""
     TRACE.clear()
+    OUTPUTS.clear()
     RESULTS.clear()
     PUBLISHED.clear()
     ON_EVENT[:] = [on_event] if on_event else []
+
+
+def _keep(f: Callable[..., str]) -> Callable[..., str]:
+    """Record what a tool returns, so the answer's figures can be checked against it."""
+    @wraps(f)
+    def run(*args, **kwargs) -> str:
+        out = f(*args, **kwargs)
+        OUTPUTS.append(out)
+        return out
+    return run
 
 
 @cache
@@ -130,6 +144,7 @@ def _figures(figures: str) -> str | None:
 # ---- Analysis ------------------------------------------------------------------------------------
 
 @beta_tool
+@_keep
 def list_indicators(domain: str = "") -> str:
     """List the indicators: id, label, unit, domain, which end is worse, and the flag group (the known-defect
     group whose cells can be flagged). Call this first when you are unsure of an indicator id.
@@ -147,6 +162,7 @@ def list_indicators(domain: str = "") -> str:
 
 
 @beta_tool
+@_keep
 def list_rounds() -> str:
     """List the 10 survey rounds: id (R01 to R10), label, survey type, series (post-harvest or lean season),
     households in the merged file, raw rows, duplicates and refused interviews removed, fieldwork window."""
@@ -155,6 +171,7 @@ def list_rounds() -> str:
 
 
 @beta_tool
+@_keep
 def get_indicator(indicator: str, breakdown: str = "national", rounds: str = "", groups: str = "") -> str:
     """Get an indicator by round: the value as merged, the value with the dashboard's indicative corrections,
     households, and whether the cell is flagged for a known defect (with the reason). Unweighted estimates over
@@ -189,6 +206,69 @@ def get_indicator(indicator: str, breakdown: str = "national", rounds: str = "",
 
 
 @beta_tool
+@_keep
+def profile_indicator(indicator: str, figures: str = "as_merged") -> str:
+    """The full profile of one indicator, computed here so that you need no arithmetic: its value for all surveyed
+    households in every round, the change since the previous round of the same series (lean season or post-harvest),
+    households and flags; then, for the last two comparable rounds of each series, the regions that improved and
+    worsened most (the relative winners and losers, read with the indicator's worse end) and how many regions were
+    compared. Use it for "how did X evolve", "where did it improve" or a summary of one indicator.
+
+    Args:
+        indicator: Indicator id from list_indicators, e.g. lcs_em.
+        figures: as_merged (default) or with_corrections.
+    """
+    call = _log("profile_indicator", indicator=indicator, figures=figures)
+    cat = _table("indicator_catalog.csv").set_index("id")
+    if indicator not in cat.index:
+        return UNKNOWN.format(indicator)
+    col = _figures(figures)
+    if col is None:
+        return "figures must be as_merged or with_corrections."
+    info = cat.loc[indicator]
+    t = _table("indicators.csv")
+    t = t[t["indicator"] == indicator]
+    order = {r: i for i, r in enumerate(_table("rounds.csv")["round_id"])}
+    nat = t[(t["breakdown"] == "national")].dropna(subset=[col]).copy()
+    if nat.empty:
+        return f"No values for {indicator}."
+    nat = nat.sort_values("round_id", key=lambda s: s.map(order))
+    nat["previous_round"] = nat.groupby("series")["round_id"].shift()
+    nat["change_since_previous"] = nat.groupby("series")[col].diff().round(2)
+    out = nat[["round_id", "round", "series", col, "previous_round", "change_since_previous", "households", "flagged",
+               "flag_reason"]].rename(columns={col: "value"})
+    worse = str(info["worse"]).lower()
+    lines = [f"# {info['label']} ({info['unit']}), {col}. Unweighted. The worse end is {worse}. A change is a difference between "
+             "two samples (no panel, no significance test)."]
+    reg = t[t["breakdown"] == "region"].dropna(subset=[col])
+    for series, s in nat.groupby("series", sort=False):
+        if len(s) < 2:
+            lines.append(f"# {series}: one round only ({s['round_id'].iloc[-1]}), no change to report.")
+            continue
+        a, b = s["round_id"].iloc[-2], s["round_id"].iloc[-1]
+        ra, rb = reg[reg["round_id"] == a].set_index("group")[col], reg[reg["round_id"] == b].set_index("group")[col]
+        d = (rb - ra).dropna().round(2).sort_values()
+        if d.empty:
+            lines.append(f"# {series}, {a} -> {b}: no region has a value in both rounds.")
+            continue
+        def top(x: pd.Series) -> str:
+            return ", ".join(f"{g} ({v:+.2f})" for g, v in x.head(3).items()) or "none"
+
+        fell, rose = d[d < 0], d[d > 0][::-1]
+        head = f"# {series}, {a} -> {b}, {len(d)} regions in both rounds."
+        if worse in ("high", "low"):
+            # The winners are the regions that moved towards the better end.
+            better, worsen = (fell, rose) if worse == "high" else (rose, fell)
+            lines.append(f"{head} Improved most: {top(better)}. Worsened most: {top(worsen)}.")
+        else:
+            lines.append(f"{head} Rose most: {top(rose)}. Fell most: {top(fell)}.")
+    if out["flagged"].any():
+        lines.append("# Flagged rounds: " + ", ".join(out.loc[out["flagged"], "round_id"]) + " (see flag_reason).")
+    return _result(out, call, f"{info['label']}: profile ({col})", "\n".join(lines) + "\n")
+
+
+@beta_tool
+@_keep
 def compare_rounds(indicator: str, round_a: str, round_b: str, breakdown: str = "national", figures: str = "as_merged") -> str:
     """Compare an indicator between two rounds: value in each, change (b - a), households, and flags. Point estimates
     only: no significance test, and the samples differ between rounds (no panel).
@@ -223,6 +303,7 @@ def compare_rounds(indicator: str, round_a: str, round_b: str, breakdown: str = 
 
 
 @beta_tool
+@_keep
 def rank_regions(indicator: str, round_id: str, figures: str = "as_merged") -> str:
     """Rank the regions on an indicator in one round, highest first, with the gap to all surveyed households.
 
@@ -255,6 +336,7 @@ def rank_regions(indicator: str, round_id: str, figures: str = "as_merged") -> s
 
 
 @beta_tool
+@_keep
 def relate_indicators(indicator_x: str, indicator_y: str, round_id: str) -> str:
     """Relate two indicators across the regions of one round (as merged): both values per region, with Pearson and
     Spearman correlations. A descriptive association between regions, not causation, not a household result.
@@ -289,6 +371,7 @@ def relate_indicators(indicator_x: str, indicator_y: str, round_id: str) -> str:
 
 
 @beta_tool
+@_keep
 def get_assistance(variable: str = "", round_id: str = "", breakdown: str = "national") -> str:
     """WFP interventions reported by households: share answering yes, by round (national) or by region and round.
     Without a variable: the list of the 20 interventions with their labels.
@@ -311,6 +394,7 @@ def get_assistance(variable: str = "", round_id: str = "", breakdown: str = "nat
 
 
 @beta_tool
+@_keep
 def get_costs(table: str = "reconciliation", year: str = "") -> str:
     """WFP's resilience costs (XAF) in WFP's revised workbook, as reconciled in the merging repository: programme-level
     tables, not per household (for that, use get_household_costs). Tables: reconciliation (stated against reconciled
@@ -350,6 +434,7 @@ HOUSEHOLD_COST_VIEWS = {
 
 
 @beta_tool
+@_keep
 def get_household_costs(view: str = "by_round", round_id: str = "", keyword: str = "") -> str:
     """The cost of WFP's assistance per household: the 44 cost variables added to the merged file by do-file 21, as the
     dashboard aggregates them, and the rules that built them. Views:
@@ -385,6 +470,7 @@ def get_household_costs(view: str = "by_round", round_id: str = "", keyword: str
 # ---- Merging process -----------------------------------------------------------------------------
 
 @beta_tool
+@_keep
 def trace_variable(variable: str, round_id: str = "") -> str:
     """Trace one harmonised variable from the raw SPSS files to the merged file, round by round: the source column,
     its type, coverage, range, question label and value labels, and how often the merged value equals the raw one
@@ -416,6 +502,7 @@ def trace_variable(variable: str, round_id: str = "") -> str:
 
 
 @beta_tool
+@_keep
 def describe_variable(variable: str, round_id: str = "") -> str:
     """The distribution of a column of the merged file by round: answer counts and shares for a categorical variable
     (counts under 5 households are hidden), or mean, 10th/50th/90th percentiles, min and max for a numeric one;
@@ -450,6 +537,7 @@ def describe_variable(variable: str, round_id: str = "") -> str:
 
 
 @beta_tool
+@_keep
 def search_variables(term: str, family: str = "") -> str:
     """Search the variables by concept, name or label (accents ignored): the columns of the merged file (with their
     group and rounds with data) and the harmonisation workbooks' variables (with how many rounds are mapped).
@@ -477,6 +565,7 @@ def search_variables(term: str, family: str = "") -> str:
 
 
 @beta_tool
+@_keep
 def get_merge_status(module: str = "") -> str:
     """How the modules were merged 1:1 on household ID. Without a module: each merge step with rows, matches, households
     in the master only or the module only, columns added, and its stage (2025 first harmonisation or 2026 extension).
@@ -514,6 +603,7 @@ def get_merge_status(module: str = "") -> str:
 
 
 @beta_tool
+@_keep
 def get_validation_checks(group: str = "", status: str = "") -> str:
     """The dashboard's validation checks, recomputed from the files: status (pass, warn, fail), what was observed and
     expected, and the detail. Groups: Rows, Merge, Workbook, Formulas, Plausibility, Assistance, Documentation, New modules.
@@ -535,6 +625,7 @@ def get_validation_checks(group: str = "", status: str = "") -> str:
 
 
 @beta_tool
+@_keep
 def search_data_issues(keyword: str = "", status: str = "", severity: str = "") -> str:
     """Documented issues of the source data and the merge: severity, status (Open, Handled, Documented), rounds
     affected, what was found, how it is handled and where in the code.
@@ -559,6 +650,7 @@ def search_data_issues(keyword: str = "", status: str = "", severity: str = "") 
 # ---- Publishing ----------------------------------------------------------------------------------
 
 @beta_tool
+@_keep
 def publish_result(result_id: str, chart: str = "table", x: str = "", y: str = "", series: str = "", title: str = "",
                    note: str = "") -> str:
     """Show a table returned by another tool to the reader, with an optional chart and a CSV download. Call it once,
@@ -595,6 +687,7 @@ def build_info() -> dict:
     return json.loads((DATA / "build_info.json").read_text(encoding="utf-8"))
 
 
-TOOLS = [list_indicators, list_rounds, get_indicator, compare_rounds, rank_regions, relate_indicators, get_assistance, get_costs, get_household_costs,
+TOOLS = [list_indicators, list_rounds, get_indicator, profile_indicator, compare_rounds, rank_regions, relate_indicators,
+         get_assistance, get_costs, get_household_costs,
          trace_variable, describe_variable, search_variables, get_merge_status, get_validation_checks, search_data_issues,
          publish_result]

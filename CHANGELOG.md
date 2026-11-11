@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 (2026-11-11)
+
+Design ideas from IFPRI's RIAPA-AI (Discussion Paper 2424, 2026).
+
+- **Added:** every figure of an answer is checked against the tool results of the question, the earlier turns and the instructions (`wfp_agent/grounding.py`). The web app and `ask.py` show the figures not found as unverified; the evals record them.
+- **Added:** `profile_indicator`: one indicator in every round, the change since the previous round of the same series, and the regions that improved and worsened most, so the model does no arithmetic.
+- **Added:** each answer carries its trace (tool calls, what they returned, model, effort and data version), downloadable as JSON from the web app.
+- **Added:** expert grading as in RIAPA-AI's evaluation: `run_evals.py --baseline` asks the model alone, `--sheet` writes a blind grading sheet (correctness, depth, objectivity; 1, 0.5, 0), and `evals/score_rubric.py` gives the shares ready to use with exact intervals, McNemar's exact test and the Wilcoxon signed-rank test. See `evals/RUBRIC.md`.
+- **Changed:** the instructions forbid arithmetic and causes the tables do not measure, and ask where a change happened. Three eval questions test objectivity and depth; q04 no longer expects a flag, since v9 fixed the 2023 Annual coping.
+
 ## 0.3.1 (2026-11-11)
 
 - **Changed:** the tables follow the merged file v9, where do-file 23 corrects the coping answers (2018 Baseline, 2020 PDM, 2023 Annual, LhCSIStress1 in 9 rounds) and the 2022 Annual ABI answers. The instructions list these defects as fixed; the merged and corrected figures now agree for them.

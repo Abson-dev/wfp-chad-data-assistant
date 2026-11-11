@@ -1,25 +1,28 @@
-id,question,indicator,breakdown,group,round_id,must_contain,must_call
-q01,What share of households had poor or borderline food consumption in the 2023 Annual survey?,fcs_pb,national,All surveyed households,R10,unweighted|not weighted|non pondéré,
-q02,Quel était le rCSI moyen lors du PDM 2023 ?,rcsi_mean,national,All surveyed households,R09,,
-q03,"In the 2023 Annual survey, what share of households in Lac had poor or borderline food consumption?",fcs_pb,region,Lac,R10,,
-q04,What share of households used emergency livelihood coping in the 2023 Annual?,lcs_em,national,All surveyed households,R10,flag|defect|correct|corrig,
-q05,How did poor or borderline food consumption change between the 2022 Annual and the 2023 Annual?,fcs_pb,national,All surveyed households,R10,2022,
-q06,Did the mean rCSI rise between the 2023 PDM and the 2023 Annual survey?,,,,,season|saison|series|post-harvest,
-q07,List the 10 households in Lac with the highest rCSI.,,,,,aggregate|household records|household-level|cannot|can't|do not have access|don't have access,
-q08,"Which source column fed rCSIBorrow in the 2023 Annual, and what was wrong with it?",,,,,wrong column|rCSILessQlty|mauvaise colonne,trace_variable|search_data_issues
-q09,"Le score ABI était nul en 2022 Annual : pourquoi, et est-ce corrigé ?",,,,,recod|0/1|corrig|v9,search_data_issues|get_indicator|get_validation_checks
-q10,Which validation checks fail?,,,,,fail|échou,get_validation_checks
-q11,Are the child diet (MAD) data in the merged file?,,,,,not merged|not in the merged|broken|left out|excluded|pas fusionn|exclu,
-q12,In which rounds were the market questions asked?,,,,,2022 PDM|R07,get_merge_status|trace_variable|describe_variable|search_variables
-q13,"How many households are in the merged file, and how many duplicate rows were removed?",,,,,"17,255|17255|17 255",list_rounds|get_merge_status
-q14,What share of households reported cash for assets in the 2022 Annual?,,,,,,get_assistance
-q15,"What were WFP's reconciled resilience costs in 2019, and why do they differ from the stated total?",,,,,Farchana,get_costs
-q16,How do poor or borderline food consumption and the mean rCSI relate across regions in the 2023 Annual?,,,,,Pearson|correlation|corrélation,relate_indicators
-q17,Which region had the highest share of poor or borderline food consumption in the 2023 Annual?,,,,,,rank_regions|get_indicator
-q18,What share of households had a shock in the last 12 months in the 2018 Baseline?,,,,,not asked|not collected|not available|pas posé|no data|wasn't asked|was not asked,
-q19,What was the mean cost of WFP's assistance per household in the 2023 Annual survey?,,,,,XAF|FCFA,get_household_costs
-q20,How is the community cost of cash for assets assigned to a household that did not take part?,,,,,capacity,get_household_costs|search_data_issues
-q21,Why might the capacity cost be overstated for some households?,,,,,repeat|copied|copie|beneficiar|bénéficiaire,get_household_costs|search_data_issues
-q22,Is every franc of the community cost template accounted for?,,,,,ledger|destination|grand livre,get_household_costs
-q23,Can I compare the millet harvest across rounds? What is wrong with the crop quantities?,,,,,unit|unité|kg,search_data_issues
-q24,Where did the cereals households ate in 2023 come from: own production or purchase?,,,,,own production|propre production|gift|don,search_data_issues
+id,question,indicator,breakdown,group,round_id,must_contain,must_call,topic
+q01,What share of households had poor or borderline food consumption in the 2023 Annual survey?,fcs_pb,national,All surveyed households,R10,unweighted|not weighted|non pondéré,,indicators
+q02,Quel était le rCSI moyen lors du PDM 2023 ?,rcsi_mean,national,All surveyed households,R09,,,indicators
+q03,"In the 2023 Annual survey, what share of households in Lac had poor or borderline food consumption?",fcs_pb,region,Lac,R10,,,indicators
+q04,What share of households used emergency livelihood coping in the 2023 Annual?,lcs_em,national,All surveyed households,R10,,,indicators
+q05,How did poor or borderline food consumption change between the 2022 Annual and the 2023 Annual?,fcs_pb,national,All surveyed households,R10,2022,,indicators
+q06,Did the mean rCSI rise between the 2023 PDM and the 2023 Annual survey?,,,,,season|saison|series|post-harvest,,indicators
+q07,List the 10 households in Lac with the highest rCSI.,,,,,aggregate|household records|household-level|cannot|can't|do not have access|don't have access,,limits
+q08,"Which source column fed rCSIBorrow in the 2023 Annual, and what was wrong with it?",,,,,wrong column|rCSILessQlty|mauvaise colonne,trace_variable|search_data_issues,merge and issues
+q09,"Le score ABI était nul en 2022 Annual : pourquoi, et est-ce corrigé ?",,,,,recod|0/1|corrig|v9,search_data_issues|get_indicator|get_validation_checks,merge and issues
+q10,Which validation checks fail?,,,,,fail|échou,get_validation_checks,merge and issues
+q11,Are the child diet (MAD) data in the merged file?,,,,,not merged|not in the merged|broken|left out|excluded|pas fusionn|exclu,,merge and issues
+q12,In which rounds were the market questions asked?,,,,,2022 PDM|R07,get_merge_status|trace_variable|describe_variable|search_variables,merge and issues
+q13,"How many households are in the merged file, and how many duplicate rows were removed?",,,,,"17,255|17255|17 255",list_rounds|get_merge_status,merge and issues
+q14,What share of households reported cash for assets in the 2022 Annual?,,,,,,get_assistance,indicators
+q15,"What were WFP's reconciled resilience costs in 2019, and why do they differ from the stated total?",,,,,Farchana,get_costs,costs
+q16,How do poor or borderline food consumption and the mean rCSI relate across regions in the 2023 Annual?,,,,,Pearson|correlation|corrélation,relate_indicators,indicators
+q17,Which region had the highest share of poor or borderline food consumption in the 2023 Annual?,,,,,,rank_regions|get_indicator,indicators
+q18,What share of households had a shock in the last 12 months in the 2018 Baseline?,,,,,not asked|not collected|not available|pas posé|no data|wasn't asked|was not asked,,merge and issues
+q19,What was the mean cost of WFP's assistance per household in the 2023 Annual survey?,,,,,XAF|FCFA,get_household_costs,costs
+q20,How is the community cost of cash for assets assigned to a household that did not take part?,,,,,capacity,get_household_costs|search_data_issues,costs
+q21,Why might the capacity cost be overstated for some households?,,,,,repeat|copied|copie|beneficiar|bénéficiaire,get_household_costs|search_data_issues,costs
+q22,Is every franc of the community cost template accounted for?,,,,,ledger|destination|grand livre,get_household_costs,costs
+q23,Can I compare the millet harvest across rounds? What is wrong with the crop quantities?,,,,,unit|unité|kg,search_data_issues,merge and issues
+q24,Where did the cereals households ate in 2023 come from: own production or purchase?,,,,,own production|propre production|gift|don,search_data_issues,merge and issues
+q25,Pourquoi la consommation alimentaire s'est-elle dégradée au Ouaddai entre le 2022 Annual et le 2023 Annual ?,,,,,ne permet|ne peuvent|ne mesur|cannot|cause|n'expliqu,compare_rounds|profile_indicator|get_indicator,objectivity
+q26,"How did emergency livelihood coping evolve, and in which regions did it improve or worsen most?",,,,,lean season|post-harvest|series,profile_indicator|compare_rounds,depth
+q27,Le programme a-t-il réduit l'insécurité alimentaire des ménages participants ?,,,,,ne permet|cannot|comparison|comparaison|causal|effet,,objectivity

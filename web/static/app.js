@@ -11,7 +11,7 @@
   let chats = load(), current = null, running = false;
 
   function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(chats.slice(0, 30))); } catch (e) { /* the chat still works without saved history */ } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(chats.slice(0, 30), (k, v) => (k === "tool_outputs" ? undefined : v))); } catch (e) { /* the chat still works without saved history */ } }
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
 
   // Small safe renderer: headings, lists, tables, bold and inline code, built as DOM nodes.
@@ -117,6 +117,26 @@
     return d;
   }
 
+  // The automatic check of the answer's figures against the tool results (wfp_agent/grounding.py).
+  function grounding(entry) {
+    const g = entry.grounding;
+    if (!g || !g.checked) return null;
+    if (g.ok) return el("p", "grounding ok", `All ${g.checked} figures of this answer were found in the tool results.`);
+    const p = el("p", "grounding warn", `Not found in the tool results, check before use: ${g.unverified.join(", ")}.`);
+    p.title = "The assistant must take every figure from its tools. These were not found there, at the precision written.";
+    return p;
+  }
+
+  // Everything behind an answer, to audit or rebuild it: question, answer, tool calls and what they returned, model and data version.
+  function traceButton(entry) {
+    const b = el("button", "trace", "Download the trace (JSON)");
+    b.type = "button";
+    b.onclick = () => download(`WFP_Chad_trace_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "")}.json`,
+      JSON.stringify({ question: entry.question, answer: entry.text, grounding: entry.grounding, provenance: entry.provenance,
+        tool_calls: entry.tool_calls, tool_outputs: entry.tool_outputs, published: entry.published }, null, 2), "application/json");
+    return b;
+  }
+
   function renderTurn(entry) {
     const turn = el("article", "turn");
     turn.append(el("div", "q", entry.question));
@@ -147,7 +167,10 @@
         }
         a.append(r);
       }
+      const g = grounding(entry);
+      if (g) a.append(g);
       a.append(sources(entry));
+      if (entry.tool_calls && entry.tool_calls.length) a.append(traceButton(entry));
     }
     turn.append(a);
     return turn;
@@ -205,7 +228,8 @@
           if (!line.startsWith("data: ")) continue;
           const ev = JSON.parse(line.slice(6));
           if (ev.type === "tool") { steps.append(el("li", "", `${ev.tool} ${Object.values(ev.args || {}).join(" · ")}`)); $("tool-count").textContent = Number($("tool-count").textContent) + 1; }
-          if (ev.type === "answer") Object.assign(entry, { text: ev.text, published: ev.published, tool_calls: ev.tool_calls });
+          if (ev.type === "answer") Object.assign(entry, { text: ev.text, published: ev.published, tool_calls: ev.tool_calls, grounding: ev.grounding,
+            provenance: ev.provenance, tool_outputs: ev.tool_outputs });
           if (ev.type === "error") entry.error = ev.message;
         }
       }

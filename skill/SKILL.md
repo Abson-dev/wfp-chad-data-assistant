@@ -7,7 +7,7 @@ metadata:
 
 # WFP Chad data
 
-Read `../wfp_agent/system_prompt.md` first: it holds the rules for reading the data and for answering. Every figure must come from a tool result. Never open the merged file or any household file.
+Read `../wfp_agent/system_prompt.md` first: it holds the rules for reading the data and for answering. Every figure must come from a tool result. Never open the merged file or any household file. Do no arithmetic: take changes, gaps and rankings from `compare_rounds`, `rank_regions` and `profile_indicator`. Explain a change only with what the tools show (season, regions and households surveyed, flags, documented issues), never with causes they do not measure.
 
 Run the tools from the root of this repository, in the `wfp-agent` (or `ensa-agent`) conda environment:
 
@@ -21,6 +21,7 @@ python wfp_cli.py get_validation_checks status=fail
 python wfp_cli.py search_data_issues keyword=coping
 python wfp_cli.py get_indicator indicator=fcs_pb rounds="R08,R10"
 python wfp_cli.py rank_regions indicator=shk_any12m round_id=R10
+python wfp_cli.py profile_indicator indicator=lcs_em
 python wfp_cli.py get_costs table=reconciliation
 python wfp_cli.py get_household_costs view=by_round round_id=R10
 python wfp_cli.py get_household_costs view=items keyword=lean

@@ -1,5 +1,6 @@
 """The browser client in real Chrome, under the production Content-Security-Policy, with scripted model replies.
 Skipped when Playwright or Chrome is not available."""
+import json
 import socket
 import threading
 import time
@@ -27,6 +28,7 @@ CASES = {
                 [("publish_result", {"result_id": "R1", "chart": "scatter", "x": "fcs_pb", "y": "rcsi_mean"})]], "Scatter."),
     "map": ([[("get_indicator", {"indicator": "fcs_pb", "breakdown": "region"})],
              [("publish_result", {"result_id": "R1", "chart": "heatmap", "x": "round", "y": "group", "series": "as_merged"})]], "Heatmap."),
+    "invented": ([[("list_rounds", {})]], "17,255 households in all, and 987.6 elsewhere."),
     "attack": ([], "<img src=x onerror=\"window.INJECTED=1\"> <script>window.INJECTED=1</script> **plain**"),
 }
 
@@ -137,6 +139,18 @@ def test_sources_list_the_tool_calls(page):
     turn.locator(".sources summary").click()
     assert "trace_variable" in turn.locator(".sources").text_content()
     assert page.locator("#tool-count").text_content() == "2"
+
+
+def test_the_check_of_the_figures_and_the_trace(page):
+    turn = ask(page, "invented")
+    warn = turn.locator(".grounding.warn")
+    assert warn.count() == 1 and "987.6" in warn.text_content() and "17,255" not in warn.text_content()
+    with page.expect_download() as d:
+        turn.locator("button.trace").click()
+    trace = json.loads(Path(d.value.path()).read_text(encoding="utf-8-sig"))
+    assert trace["grounding"]["unverified"] == ["987.6"] and trace["tool_calls"][0]["tool"] == "list_rounds"
+    assert trace["tool_outputs"][0].startswith("result_id:") and trace["provenance"]["model"]
+    assert not page.problems and not page.outside
 
 
 def test_history_survives_a_reload(page):

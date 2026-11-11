@@ -47,10 +47,11 @@ Everything built from the invented dashboard is labelled synthetic, in the tools
 flowchart LR
   A["Merged file<br/>(17,255 households)"] -->|"prepare_app_data.R<br/>(dashboard, runs locally)"| B["Dashboard aggregates<br/>cells under 30 suppressed"]
   B -->|"build_agent_data.py"| C["data/<br/>aggregates and metadata"]
-  C --> D["16 read-only tools"]
+  C --> D["17 read-only tools"]
   D <--> E["Claude"]
   D -->|"publish_result:<br/>checked by the server"| F["Chart, table, CSV,<br/>sources"]
   E --> F
+  E -->|"every figure checked<br/>against the tool results"| F
 ```
 
 The dashboard's `prepare_app_data.R` is the only step that reads household data. `build_agent_data.py` reshapes its aggregates, adds the issue list, the module list and the indicator catalogue, and refuses to build if any table carries a household-level column. The model chooses which tools to call and which columns and chart type to show. It never sees a household record, writes no code that runs, and cannot change any file.
@@ -59,7 +60,8 @@ The dashboard's `prepare_app_data.R` is the only step that reads household data.
 |---|---|
 | **No household data reaches the model** | The build reads only the dashboard's aggregates, and stops if a table has an identifying column (ID, village, GPS, interview date). The tools read only `data/`. Tests check every table. |
 | **Small cells stay hidden** | Regional cells under 30 households are suppressed by the dashboard, and the tests check it. |
-| **Numbers come from tools** | The instructions forbid estimating, and each answer lists its tool calls. |
+| **Numbers come from tools** | The instructions forbid estimating and arithmetic, and the tools compute the changes and gaps. After each answer, [`grounding.py`](wfp_agent/grounding.py) looks for every figure in the tool results, at the precision written; one not found is shown to the reader as unverified. Each answer lists its tool calls, and its full trace can be downloaded. |
+| **No story the data cannot tell** | The instructions forbid attributing a change to causes the tables do not measure (rainfall, prices, conflict, the programme), and policy advice. |
 | **Known defects are visible** | Every figure comes as merged and with the dashboard's indicative corrections, with a flag and its reason where a defect is known. |
 | **Charts cannot mislead on season** | The server refuses a line joining the lean-season (PDM) rounds to the post-harvest rounds, a chart with duplicate rows, and non-numeric axes. |
 | **Text from the model cannot run** | The browser inserts it as text; a strict Content-Security-Policy forbids outside scripts, and nothing is loaded from outside the app. |
@@ -92,6 +94,7 @@ Anyone can run the tools directly with `python wfp_cli.py`, with no API key.
 | | `get_merge_status` | Each merge step (rows, matches, columns added), or the households a module reaches in each round |
 | | `get_validation_checks`, `search_data_issues` | The dashboard's checks (pass, warn, fail) and the documented data issues |
 | **The analysis** | `list_rounds`, `list_indicators`, `get_indicator`, `compare_rounds` | 55 indicators by round, national or by region, as merged and with corrections |
+| | `profile_indicator` | One indicator in every round, with the change since the previous round of the same series, and the regions that improved and worsened most |
 | | `rank_regions`, `relate_indicators` | Regions against all surveyed households; two indicators across regions, with correlations |
 | **The programme** | `get_assistance`, `get_costs` | The WFP interventions households report; WFP's reconciled resilience costs (XAF) by period, activity, area and partner |
 | **Costs per household** | `get_household_costs` | The 44 cost variables of the merged file as aggregates: by round (and the source of the community cost), by intervention, by asset type, by region; the ledger of the community template; the template against WFP's revised workbook; unit costs, exchange rates and the dictionary of the cost variables |
@@ -140,6 +143,8 @@ python -m pytest                       # invented dashboard: no data, no API key
 WFP_TEST_REAL_DATA=1 python -m pytest  # the same on the real tables, plus 4 checks (your computer only)
 python evals/run_evals.py --dry-run    # the eval questions and their expected values
 python evals/run_evals.py              # asks the model each question and grades the answers (paid)
+python evals/run_evals.py --baseline --sheet   # also the model alone, and a blind sheet for expert grading (paid, twice)
+python evals/score_rubric.py SHEET KEY         # scores the graded sheet: shares ready to use, McNemar and Wilcoxon
 ```
 
 | Layer | What it checks | Model? |
@@ -149,9 +154,11 @@ python evals/run_evals.py              # asks the model each question and grades
 | `tests/test_publish_and_loop.py` | Chart checks and the agent loop, through the real tools with [scripted replies](tests/scripted_model.py) | Scripted |
 | `tests/test_web.py` | Streaming, password, sessions, limits, startup rule | Scripted |
 | `tests/test_browser.py` | The client in real Chrome under the production security policy: every chart type, injected HTML, CSV, history, phone width | Scripted |
-| `evals/run_evals.py` | 24 questions: the right number (± 0.15), the expected caveats, the right tools | **Live** |
+| `tests/test_grounding_and_rubric.py` | The check of the figures, the indicator profile, the trace, the grading statistics | Scripted |
+| `evals/run_evals.py` | 27 questions: the right number (± 0.15), the expected caveats, the right tools, every figure found in the tools | **Live** |
+| [`evals/RUBRIC.md`](evals/RUBRIC.md) | Experts score the answers of the agent and of the model alone, blind, on correctness, depth and objectivity | **Live**, and people |
 
-Only the evals say how good the model's answers are. A full run makes paid API calls, once per question plus its tool rounds. Run them after any change to [the instructions](wfp_agent/system_prompt.md) or the tools.
+Only the evals say how good the model's answers are, and only the expert grading says whether they are good enough to use. A full run makes paid API calls, once per question plus its tool rounds. Run them after any change to [the instructions](wfp_agent/system_prompt.md) or the tools.
 
 ## Repository
 
@@ -164,6 +171,7 @@ Only the evals say how good the model's answers are. A full run makes paid API c
 ├── wfp_agent/
 │   ├── tools.py           the read-only tools
 │   ├── results.py         checks what is published
+│   ├── grounding.py       checks every figure of an answer against the tool results
 │   ├── system_prompt.md   the instructions: rounds, caveats, known defects, merging process, answer style
 │   └── agent.py           tool loop, history, token counts
 ├── web/                   FastAPI server and browser client (Vega served locally)
@@ -172,5 +180,19 @@ Only the evals say how good the model's answers are. A full run makes paid API c
 ├── tests/, evals/         offline tests; live evals
 └── data/, demo_data/      generated, not versioned
 ```
+
+## Lessons from RIAPA-AI
+
+Version 0.4.0 takes four ideas from IFPRI's RIAPA-AI, an assistant over a CGE model (Mukashov et al., 2026, [IFPRI Discussion Paper 2424](https://hdl.handle.net/10568/183521)):
+
+| RIAPA-AI | Here |
+|---|---|
+| The model's narrative rests only on the numbers the CGE model solved. | The tools are the engine: they compute the changes and the regional gaps, and [`grounding.py`](wfp_agent/grounding.py) checks every figure of the answer against what they returned. |
+| A plain model invents causes ("children taken out of school"). | The instructions forbid causes the tables do not measure, and two eval questions test it. |
+| A report traces winners and losers, not only the headline. | `profile_indicator` gives each indicator's path within each series and the regions that improved and worsened most. |
+| Every artifact can be downloaded and checked. | Each answer's trace (question, tool calls, what they returned, model and data version) downloads as JSON. |
+| An expert panel grades the assistant against human analysts and a plain model. | `run_evals.py --baseline --sheet` and [`evals/RUBRIC.md`](evals/RUBRIC.md): blind expert grading against the model alone, with RIAPA-AI's scale and tests. |
+
+RIAPA-AI also asks the user to confirm a scenario before it runs the model. Here, look-ups are cheap and the assistant states the reading it used, so it does not ask first.
 
 See also [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and [CHANGELOG.md](CHANGELOG.md). The design follows the [ENSA Chad data assistant](https://github.com/Abson-dev/ensa-chad-data-assistant) and [eurostat-assistant](https://github.com/ainergy-hub/eurostat-assistant).

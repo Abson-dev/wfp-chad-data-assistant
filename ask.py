@@ -22,6 +22,11 @@ from wfp_agent.agent import MODEL, WfpAgent  # noqa: E402
 
 def show(answer, sources: bool) -> None:
     print("\n" + answer.text + "\n")
+    g = answer.grounding
+    if g["unverified"]:
+        print("Not found in the tool results, check before use: " + ", ".join(g["unverified"]) + "\n")
+    elif g["checked"]:
+        print(f"All {g['checked']} figures were found in the tool results.\n")
     if sources and answer.tool_calls:
         print("Sources (tool calls):")
         for c in answer.tool_calls:
