@@ -65,10 +65,10 @@ The dashboard's `prepare_app_data.R` is the only step that reads household data.
 | **Known defects are visible** | Every figure comes as merged and with the dashboard's indicative corrections, with a flag and its reason where a defect is known. |
 | **Charts cannot mislead on season** | The server refuses a line joining the lean-season (PDM) rounds to the post-harvest rounds, a chart with duplicate rows, and non-numeric axes. |
 | **Text from the model cannot run** | The browser inserts it as text; a strict Content-Security-Policy forbids outside scripts, and nothing is loaded from outside the app. |
-| **Each question is bounded** | 12 tool rounds, 180 seconds and 500 rows, in [`limits.json`](limits.json). |
+| **Each question is bounded** | 12 tool rounds, 180 seconds and 500 rows, and 100 questions a day on one computer, in [`limits.json`](limits.json). |
 | **Access is controlled** | The app listens on this computer only by default, and refuses to start on a reachable host without a password. |
 
-**Regional aggregates are sent to the Anthropic API when a question needs them. Agree this use with WFP before sharing the assistant.** Chat history stays in the user's browser and can quote regional values.
+**Regional aggregates are sent to the Anthropic API when a question needs them. Agree this use with WFP before sharing the assistant.** Chat history stays in the user's browser and can quote regional values. The opinions on the answers and the count of questions per day stay in `local/` on the computer that runs the app (not versioned).
 
 ## Linked with the dashboard
 
@@ -83,6 +83,12 @@ The assistant and the [dashboard](https://abson-dev.shinyapps.io/wfp-chad-data-m
 | **Skill**: [`skill/SKILL.md`](skill/SKILL.md) with `wfp_cli.py` | An assistant that loads skills, such as Claude Code | The same tools from the assistant you already use |
 
 Anyone can run the tools directly with `python wfp_cli.py`, with no API key.
+
+In the web app, the welcome page and the side bar also give:
+
+- **See an example**: a fixed answer the server writes from the tables, with its chart, check and trace. It needs no API key, costs nothing and does not count against the daily limit.
+- **How it works** and **Rounds and data**: how an answer is made and checked, how to read the figures, the data version, the rounds and the tools.
+- **An opinion under each answer** (useful or not, with a comment), kept in `local/feedback.jsonl`. Read it to find weak answers; a question that failed is a good new line for `evals/questions.csv`.
 
 ## What it can answer
 
@@ -131,6 +137,8 @@ On a server, always set a password and put HTTPS in front of it: `APP_PASSWORD=.
 | `WFP_AGENT_DATA` | `data/` | Folder of the tables |
 | `WFP_DASHBOARD_URL` | `https://abson-dev.shinyapps.io/wfp-chad-data-merging/` | The dashboard each result links back to (`#page=...`); empty for no link |
 | `WFP_DASHBOARD_APP` | `../WFP_Chad_Cost_Benefit_Analysis_data_merging/app` | The dashboard folder the build reads |
+| `WFP_AGENT_STATE` | `local/` | Where the web app keeps the feedback and the daily count |
+| `WFP_AGENT_SYSTEM_CERTS` | `true` | Trust the system's certificates (needed behind networks that inspect HTTPS); `false` to use Python's own list only |
 
 The instructions and tool definitions are cached between questions. `ask.py` prints the tokens used; see the [current prices](https://www.anthropic.com/pricing).
 
@@ -152,7 +160,7 @@ python evals/score_rubric.py SHEET KEY         # scores the graded sheet: shares
 | `tests/test_build.py` | Figures equal to the dashboard's, flags, suppression, the household-column guard | No |
 | `tests/test_tools.py` | Every tool, including its error messages, and the command line | No |
 | `tests/test_publish_and_loop.py` | Chart checks and the agent loop, through the real tools with [scripted replies](tests/scripted_model.py) | Scripted |
-| `tests/test_web.py` | Streaming, password, sessions, limits, startup rule | Scripted |
+| `tests/test_web.py`, `tests/test_web_pages.py` | Streaming, password, sessions, limits, startup rule; the example, the information pages, the feedback, the daily limit | Scripted |
 | `tests/test_browser.py` | The client in real Chrome under the production security policy: every chart type, injected HTML, CSV, history, phone width | Scripted |
 | `tests/test_grounding_and_rubric.py` | The check of the figures, the indicator profile, the trace, the grading statistics | Scripted |
 | `evals/run_evals.py` | 27 questions: the right number (± 0.15), the expected caveats, the right tools, every figure found in the tools | **Live** |
@@ -172,12 +180,14 @@ Only the evals say how good the model's answers are, and only the expert grading
 │   ├── tools.py           the read-only tools
 │   ├── results.py         checks what is published
 │   ├── grounding.py       checks every figure of an answer against the tool results
+│   ├── example.py         the fixed example, written from the tables with no model
 │   ├── system_prompt.md   the instructions: rounds, caveats, known defects, merging process, answer style
 │   └── agent.py           tool loop, history, token counts
 ├── web/                   FastAPI server and browser client (Vega served locally)
 ├── skill/                 the same tools as a skill for any assistant
 ├── demo/                  the invented dashboard behind the demo and the tests
 ├── tests/, evals/         offline tests; live evals
+├── local/                 feedback and the daily count of the web app, not versioned
 └── data/, demo_data/      generated, not versioned
 ```
 
@@ -194,5 +204,7 @@ Version 0.4.0 takes four ideas from IFPRI's RIAPA-AI, an assistant over a CGE mo
 | An expert panel grades the assistant against human analysts and a plain model. | `run_evals.py --baseline --sheet` and [`evals/RUBRIC.md`](evals/RUBRIC.md): blind expert grading against the model alone, with RIAPA-AI's scale and tests. |
 
 RIAPA-AI also asks the user to confirm a scenario before it runs the model. Here, look-ups are cheap and the assistant states the reading it used, so it does not ask first.
+
+Version 0.5.0 takes five more from the riapa.ai web app: the caution on the welcome page (results are not forecasts), an example open without an account, the "How it works" and "Countries and models" pages (here "Rounds and data"), the feedback link, and a daily limit of questions.
 
 See also [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md) and [CHANGELOG.md](CHANGELOG.md). The design follows the [ENSA Chad data assistant](https://github.com/Abson-dev/ensa-chad-data-assistant) and [eurostat-assistant](https://github.com/ainergy-hub/eurostat-assistant).

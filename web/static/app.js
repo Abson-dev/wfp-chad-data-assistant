@@ -137,9 +137,44 @@
     return b;
   }
 
+  // An opinion on the answer: kept on this computer, to find weak answers and new eval questions.
+  function feedbackBox(entry) {
+    const box = el("div", "feedback");
+    if (entry.feedback) { box.append(el("span", "muted", "Thank you: your opinion was saved.")); return box; }
+    box.append(el("span", "", "Was this answer useful?"));
+    const comment = el("textarea");
+    comment.rows = 2; comment.maxLength = 1000; comment.hidden = true;
+    comment.placeholder = "Optional: what is wrong or missing?";
+    const send = el("button", "small", "Send");
+    send.type = "button"; send.hidden = true;
+    let rating = null;
+    const choose = (r, b) => {
+      rating = r;
+      box.querySelectorAll(".rate").forEach((x) => x.classList.toggle("on", x === b));
+      comment.hidden = false; send.hidden = false; comment.focus();
+    };
+    [["up", "👍 Yes"], ["down", "👎 No"]].forEach(([r, label]) => {
+      const b = el("button", "rate", label);
+      b.type = "button"; b.setAttribute("aria-label", r === "up" ? "Useful" : "Not useful");
+      b.onclick = () => choose(r, b);
+      box.append(b);
+    });
+    send.onclick = async () => {
+      send.disabled = true;
+      const body = { question: entry.question, answer: entry.text || "", rating, comment: comment.value.trim(), tool_calls: entry.tool_calls || [],
+        grounding: entry.grounding || {}, provenance: entry.provenance || {}, example: !!entry.example };
+      const res = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+      if (res && res.ok) { entry.feedback = rating; save(); box.replaceWith(feedbackBox(entry)); }
+      else { send.disabled = false; box.append(el("span", "error", " Not saved, try again.")); }
+    };
+    box.append(comment, send);
+    return box;
+  }
+
   function renderTurn(entry) {
     const turn = el("article", "turn");
     turn.append(el("div", "q", entry.question));
+    if (entry.example) turn.append(el("p", "example-tag", "Example · written by the server from the tables, no model"));
     const a = el("div", "a");
     if (entry.error) a.append(el("p", "error", entry.error));
     else {
@@ -171,6 +206,7 @@
       if (g) a.append(g);
       a.append(sources(entry));
       if (entry.tool_calls && entry.tool_calls.length) a.append(traceButton(entry));
+      a.append(feedbackBox(entry));
     }
     turn.append(a);
     return turn;
@@ -190,6 +226,8 @@
     $("tool-note").textContent = n ? "In this chat" : "None in this chat";
   }
   function paintAll() {
+    $("info").hidden = true;
+    $("thread").hidden = false;
     const thread = $("thread");
     thread.textContent = "";
     $("welcome").hidden = !!(current && current.turns.length);
@@ -203,7 +241,7 @@
     if (!current) { current = { title: question.slice(0, 60), turns: [] }; chats.unshift(current); }
     running = true;
     $("send").disabled = true;
-    $("welcome").hidden = true;
+    $("welcome").hidden = true; $("info").hidden = true; $("thread").hidden = false;
     const history = current.turns.flatMap((t) => (t.error ? [] : [{ role: "user", content: t.question }, { role: "assistant", content: t.text || "(no text)" }]));
     const live = el("article", "turn");
     live.append(el("div", "q", question));
@@ -239,12 +277,81 @@
     }
     current.turns.push(entry);
     save();
+    refreshUsage();
     running = false;
     $("send").disabled = false;
     live.remove();
     $("thread").append(renderTurn(entry));
     paintSidebar();
     $("thread").lastElementChild.scrollIntoView({ block: "start" });
+  }
+
+  function showUsage(u) {
+    if (!u) return;
+    const left = Math.max(0, u.per_day - u.today);
+    $("usage").textContent = `Questions today: ${u.today} of ${u.per_day}` + (left ? "" : " · limit reached, the example still works");
+  }
+  function refreshUsage() { fetch("/api/status").then((r) => r.json()).then((s) => showUsage(s.usage)).catch(() => {}); }
+
+  // The fixed example: a new chat holding one answer written by the server, at no cost.
+  async function showExample() {
+    if (running) return;
+    running = true;
+    try {
+      const res = await fetch("/api/example");
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.detail || `The server answered ${res.status}.`);
+      current = { title: "Example: " + j.question.slice(0, 50), turns: [Object.assign(j, { example: true })] };
+      chats.unshift(current);
+      save();
+    } catch (e) {
+      current = { title: "Example", turns: [{ question: "Example", error: e.message, tool_calls: [] }] };
+    }
+    running = false;
+    paintAll();
+  }
+
+  // "How it works" and "Rounds and data", filled from /api/about.
+  async function showInfo(kind) {
+    const body = $("info-body");
+    body.textContent = "";
+    $("welcome").hidden = true; $("thread").hidden = true; $("info").hidden = false;
+    const about = await fetch("/api/about").then((r) => r.json()).catch(() => ({}));
+    const data = about.data || {}, limits = about.limits || {};
+    if (kind === "how") {
+      body.append($("how-it-works").content.cloneNode(true));
+      body.querySelectorAll("[data-fill]").forEach((n) => {
+        const k = n.dataset.fill, v = data[k] !== undefined ? data[k] : limits[k];
+        if (v !== undefined && v !== null) n.textContent = String(v);
+      });
+      return;
+    }
+    body.append(el("h2", "", "Rounds and data"));
+    body.append(el("p", "", data.merged_file
+      ? `Merged file ${data.merged_file}: ${Number(data.households).toLocaleString("en-US")} households, ${data.columns} columns. Tables built ${String(data.built_at || "").slice(0, 10)} from the dashboard run of ${String(data.dashboard_run || "").slice(0, 10)}.`
+      : "The agent's tables are not built: run python build_agent_data.py."));
+    if (data.synthetic) body.append(el("p", "error", "SYNTHETIC DEMO DATA: every value is invented."));
+    const rows = about.rounds || [];
+    if (rows.length) {
+      const names = { round_id: "Id", round: "Round", survey: "Survey", series: "Series", final_rows: "Households", regions: "Regions", date_p01: "Fieldwork from", date_p99: "to" };
+      const cols = Object.keys(rows[0]);
+      const t = el("table", "md"), head = t.createTHead().insertRow();
+      cols.forEach((c) => head.append(el("th", "", names[c] || c)));
+      const tb = t.createTBody();
+      rows.forEach((r) => { const tr = tb.insertRow(); cols.forEach((c) => { tr.insertCell().textContent = fmt(r[c]); }); });
+      const wrap = el("div", "table-wrap");
+      wrap.append(t);
+      body.append(wrap);
+      body.append(el("p", "muted", "Post-harvest rounds: the baseline and the annual surveys. Lean-season rounds: the post-distribution monitoring (PDM). Compare within a series."));
+    }
+    body.append(el("h3", "", "The assistant's tools"));
+    const ul = el("ul");
+    (about.tools || []).forEach((t) => { const li = el("li"); li.append(el("code", "", t.name), document.createTextNode(" " + t.does)); ul.append(li); });
+    body.append(ul);
+  }
+
+  function open(kind) {
+    if (kind === "example") showExample(); else showInfo(kind);
   }
 
   function start(status) {
@@ -266,9 +373,12 @@
       b.onclick = () => { $("question").value = q; ask(q); $("question").value = ""; };
       box.append(b);
     });
+    showUsage(status.usage);
     paintAll();
   }
 
+  document.querySelectorAll("[data-open]").forEach((b) => { b.onclick = () => open(b.dataset.open); });
+  $("info-back").onclick = () => paintAll();
   $("ask").addEventListener("submit", (e) => { e.preventDefault(); const q = $("question").value.trim(); if (q) { $("question").value = ""; ask(q); } });
   $("question").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ask").requestSubmit(); } });
   $("new-chat").onclick = () => { if (!running) { current = null; paintAll(); $("question").focus(); } };

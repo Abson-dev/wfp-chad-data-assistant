@@ -17,6 +17,10 @@ for p in (REPO, REPO / "web", REPO / "tests", REPO / "demo", REPO / "evals"):
     sys.path.insert(0, str(p))
 
 REAL = os.environ.get("WFP_TEST_REAL_DATA") == "1"
+# The web app's feedback and daily count go to a temporary folder, not to local/.
+_state = Path(tempfile.mkdtemp(prefix="wfp_state_"))
+atexit.register(shutil.rmtree, _state, ignore_errors=True)
+os.environ["WFP_AGENT_STATE"] = str(_state)
 if not REAL:
     # Before any test imports wfp_agent.tools, which reads the data folder when it is imported.
     import make_demo_data

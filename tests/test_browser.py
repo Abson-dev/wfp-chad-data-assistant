@@ -1,6 +1,7 @@
 """The browser client in real Chrome, under the production Content-Security-Policy, with scripted model replies.
 Skipped when Playwright or Chrome is not available."""
 import json
+import re
 import socket
 import threading
 import time
@@ -151,6 +152,39 @@ def test_the_check_of_the_figures_and_the_trace(page):
     assert trace["grounding"]["unverified"] == ["987.6"] and trace["tool_calls"][0]["tool"] == "list_rounds"
     assert trace["tool_outputs"][0].startswith("result_id:") and trace["provenance"]["model"]
     assert not page.problems and not page.outside
+
+
+def test_the_welcome_page_warns_and_opens_the_example(page):
+    assert "not forecasts" in page.locator(".caution").text_content()
+    page.locator(".welcome-links [data-open=example]").click()
+    turn = page.locator(".turn").last
+    turn.locator(".chart svg").first.wait_for(timeout=10000)
+    assert turn.locator(".example-tag").count() == 1 and turn.locator(".grounding.ok").count() == 1
+    assert page.locator(".history li").count() == 1 and page.locator("#tool-count").text_content() == "2"
+    assert not page.problems and not page.outside
+
+
+def test_how_it_works_and_rounds_pages(page):
+    page.locator(".side-nav [data-open=how]").click()
+    page.locator("#info-body h2").wait_for()
+    assert page.locator("#info-body h2").text_content() == "How it works" and page.locator("#welcome").is_hidden()
+    assert page.locator("#info-body [data-fill=merged_file]").text_content().endswith(".dta")
+    page.locator(".side-nav [data-open=rounds]").click()
+    page.locator("#info-body table").wait_for()
+    assert page.locator("#info-body tbody tr").count() == 10 and "profile_indicator" in page.locator("#info-body").text_content()
+    page.click("#info-back")
+    assert page.locator("#info").is_hidden() and page.locator("#welcome").is_visible()
+    assert not page.problems and not page.outside
+
+
+def test_feedback_on_an_answer(page):
+    turn = ask(page, "merged")
+    turn.locator(".feedback .rate").nth(1).click()
+    turn.locator(".feedback textarea").fill("The flag is missing.")
+    turn.locator(".feedback .small").click()
+    page.locator(".feedback .muted").wait_for()
+    assert "saved" in turn.locator(".feedback").text_content()
+    assert re.match(r"Questions today: [1-9]\d* of \d+", page.locator("#usage").text_content())
 
 
 def test_history_survives_a_reload(page):

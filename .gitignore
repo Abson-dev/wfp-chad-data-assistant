@@ -2,6 +2,8 @@
 /data/
 /demo_data/
 evals/results/
+# The web app's feedback and daily question count: answers quote regional figures
+/local/
 
 # Never in this repository
 *.sav

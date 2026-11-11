@@ -219,52 +219,67 @@ def profile_indicator(indicator: str, figures: str = "as_merged") -> str:
         figures: as_merged (default) or with_corrections.
     """
     call = _log("profile_indicator", indicator=indicator, figures=figures)
-    cat = _table("indicator_catalog.csv").set_index("id")
-    if indicator not in cat.index:
+    if not _known_indicator(indicator):
         return UNKNOWN.format(indicator)
     col = _figures(figures)
     if col is None:
         return "figures must be as_merged or with_corrections."
-    info = cat.loc[indicator]
+    prof = indicator_profile(indicator, col)
+    if prof is None:
+        return f"No values for {indicator}."
+    info, out = prof["info"], prof["table"]
+
+    def top(x: pd.Series) -> str:
+        return ", ".join(f"{g} ({v:+.2f})" for g, v in x.head(3).items()) or "none"
+
+    lines = [f"# {info['label']} ({info['unit']}), {col}. Unweighted. The worse end is {prof['worse']}. A change is a difference "
+             "between two samples (no panel, no significance test)."]
+    for m in prof["movers"]:
+        if m["n"] is None:
+            lines.append(f"# {m['series']}: one round only ({m['b']}), no change to report.")
+        elif m["n"] == 0:
+            lines.append(f"# {m['series']}, {m['a']} -> {m['b']}: no region has a value in both rounds.")
+        else:
+            names = ("Improved most", "Worsened most") if m["directed"] else ("Rose most", "Fell most")
+            lines.append(f"# {m['series']}, {m['a']} -> {m['b']}, {m['n']} regions in both rounds. "
+                         f"{names[0]}: {top(m['first'])}. {names[1]}: {top(m['second'])}.")
+    if out["flagged"].any():
+        lines.append("# Flagged rounds: " + ", ".join(out.loc[out["flagged"], "round_id"]) + " (see flag_reason).")
+    return _result(out, call, f"{info['label']}: profile ({col})", "\n".join(lines) + "\n")
+
+
+def indicator_profile(indicator: str, col: str = "as_merged") -> dict | None:
+    """The numbers behind profile_indicator, also used by the web app's fixed example: the national value by round with
+    the change since the previous round of the same series; and, for the last two rounds of each series, the regional
+    changes split into the regions that moved towards the better end (first) and towards the worse end (second)."""
+    info = _table("indicator_catalog.csv").set_index("id").loc[indicator]
     t = _table("indicators.csv")
     t = t[t["indicator"] == indicator]
     order = {r: i for i, r in enumerate(_table("rounds.csv")["round_id"])}
     nat = t[(t["breakdown"] == "national")].dropna(subset=[col]).copy()
     if nat.empty:
-        return f"No values for {indicator}."
+        return None
     nat = nat.sort_values("round_id", key=lambda s: s.map(order))
     nat["previous_round"] = nat.groupby("series")["round_id"].shift()
     nat["change_since_previous"] = nat.groupby("series")[col].diff().round(2)
     out = nat[["round_id", "round", "series", col, "previous_round", "change_since_previous", "households", "flagged",
-               "flag_reason"]].rename(columns={col: "value"})
+               "flag_reason"]].rename(columns={col: "value"}).reset_index(drop=True)
     worse = str(info["worse"]).lower()
-    lines = [f"# {info['label']} ({info['unit']}), {col}. Unweighted. The worse end is {worse}. A change is a difference between "
-             "two samples (no panel, no significance test)."]
     reg = t[t["breakdown"] == "region"].dropna(subset=[col])
+    movers = []
     for series, s in nat.groupby("series", sort=False):
         if len(s) < 2:
-            lines.append(f"# {series}: one round only ({s['round_id'].iloc[-1]}), no change to report.")
+            movers.append({"series": series, "a": None, "b": s["round_id"].iloc[-1], "n": None})
             continue
         a, b = s["round_id"].iloc[-2], s["round_id"].iloc[-1]
         ra, rb = reg[reg["round_id"] == a].set_index("group")[col], reg[reg["round_id"] == b].set_index("group")[col]
         d = (rb - ra).dropna().round(2).sort_values()
-        if d.empty:
-            lines.append(f"# {series}, {a} -> {b}: no region has a value in both rounds.")
-            continue
-        def top(x: pd.Series) -> str:
-            return ", ".join(f"{g} ({v:+.2f})" for g, v in x.head(3).items()) or "none"
-
         fell, rose = d[d < 0], d[d > 0][::-1]
-        head = f"# {series}, {a} -> {b}, {len(d)} regions in both rounds."
-        if worse in ("high", "low"):
-            # The winners are the regions that moved towards the better end.
-            better, worsen = (fell, rose) if worse == "high" else (rose, fell)
-            lines.append(f"{head} Improved most: {top(better)}. Worsened most: {top(worsen)}.")
-        else:
-            lines.append(f"{head} Rose most: {top(rose)}. Fell most: {top(fell)}.")
-    if out["flagged"].any():
-        lines.append("# Flagged rounds: " + ", ".join(out.loc[out["flagged"], "round_id"]) + " (see flag_reason).")
-    return _result(out, call, f"{info['label']}: profile ({col})", "\n".join(lines) + "\n")
+        directed = worse in ("high", "low")
+        # The winners are the regions that moved towards the better end.
+        first, second = ((fell, rose) if worse == "high" else (rose, fell)) if directed else (rose, fell)
+        movers.append({"series": series, "a": a, "b": b, "n": len(d), "directed": directed, "first": first, "second": second})
+    return {"info": info, "worse": worse, "table": out, "movers": movers}
 
 
 @beta_tool

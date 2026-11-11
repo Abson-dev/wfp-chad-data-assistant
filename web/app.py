@@ -18,7 +18,9 @@ import sys
 import threading
 import time
 from collections.abc import Callable
+from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -30,6 +32,8 @@ sys.path.insert(0, str(AGENT))
 from wfp_agent import tools  # noqa: E402
 
 STATIC = Path(__file__).with_name("static")
+# The feedback and the count of questions per day stay on this computer (not versioned): answers quote regional figures.
+STATE = Path(os.environ.get("WFP_AGENT_STATE", AGENT / "local"))
 COOKIE = "wfp_agent_session"
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 CSP = "; ".join(["default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'", "img-src 'self' data:",
@@ -43,6 +47,45 @@ class Chat(BaseModel):
 
 class Unlock(BaseModel):
     password: str
+
+
+class Feedback(BaseModel):
+    question: str
+    answer: str = ""
+    rating: Literal["up", "down"]
+    comment: str = ""
+    tool_calls: list[dict] = []
+    grounding: dict = {}
+    provenance: dict = {}
+    example: bool = False
+
+
+class DailyCount:
+    """Questions sent to the model today, kept in a file so a restart does not reset the limit."""
+
+    def __init__(self, path: Path, per_day: int):
+        self.path, self.per_day, self.lock = path, per_day, threading.Lock()
+
+    def _read(self) -> int:
+        try:
+            saved = json.loads(self.path.read_text(encoding="utf-8"))
+            return int(saved["count"]) if saved.get("date") == date.today().isoformat() else 0
+        except (OSError, ValueError, KeyError, TypeError):
+            return 0
+
+    def used(self) -> int:
+        with self.lock:
+            return self._read()
+
+    def take(self) -> bool:
+        """Count one question, or refuse when today's limit is reached."""
+        with self.lock:
+            n = self._read()
+            if n >= self.per_day:
+                return False
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps({"date": date.today().isoformat(), "count": n + 1}), encoding="utf-8")
+            return True
 
 
 def check_startup(host: str, password: str, allow_unlocked: bool) -> None:
@@ -62,13 +105,23 @@ def clean_history(history: list[dict]) -> list[dict]:
     return turns
 
 
+def first_sentence(doc: str) -> str:
+    """The first sentence of a tool's description, for the "Rounds and data" page."""
+    # The SDK splits a docstring's first line from the rest with a blank line, even mid-sentence: join them again.
+    text = " ".join(doc.split())
+    return text.split(". ")[0].rstrip(".") + "."
+
+
 def default_agent_factory():
     from wfp_agent.agent import WfpAgent
     return WfpAgent()
 
 
-def create_app(password: str = "", agent_factory: Callable = default_agent_factory) -> FastAPI:
+def create_app(password: str = "", agent_factory: Callable = default_agent_factory, state: Path | None = None) -> FastAPI:
     app = FastAPI(title="WFP Chad data assistant", docs_url=None, redoc_url=None, openapi_url=None)
+    state = state or STATE
+    count = DailyCount(state / "usage.json", tools.LIMITS["questions_per_day"])
+    feedback_lock = threading.Lock()
     secret = secrets.token_bytes(32)
     busy = threading.Semaphore(tools.LIMITS["concurrent_questions"])
     attempts: dict[str, list[float]] = {}
@@ -127,7 +180,52 @@ def create_app(password: str = "", agent_factory: Callable = default_agent_facto
         except FileNotFoundError:
             info = None
         return {"locked": False, "password_set": bool(password), "has_api_key": bool(os.environ.get("ANTHROPIC_API_KEY")),
-                "data": info, "tools": [t.name for t in tools.TOOLS], "limits": tools.LIMITS}
+                "data": info, "tools": [t.name for t in tools.TOOLS], "limits": tools.LIMITS,
+                "usage": {"today": count.used(), "per_day": tools.LIMITS["questions_per_day"]}}
+
+    @app.get("/api/about")
+    def about(request: Request):
+        """What the "How it works" and "Rounds and data" pages show: the data version, the rounds and the tools."""
+        if not unlocked(request):
+            raise HTTPException(401, "Locked.")
+        try:
+            rounds = tools._table("rounds.csv")
+            cols = [c for c in ("round_id", "round", "survey", "series", "final_rows", "regions", "date_p01", "date_p99") if c in rounds]
+            info, rows = tools.build_info(), rounds[cols].to_dict(orient="records")
+        except FileNotFoundError:
+            info, rows = None, []
+        described = [{"name": t.name, "does": first_sentence(t.description or "")} for t in tools.TOOLS]
+        return {"data": info, "rounds": rows, "tools": described, "limits": tools.LIMITS}
+
+    @app.get("/api/example")
+    def example(request: Request):
+        """A fixed answer written by the server from the tables: no model, no API key, no cost."""
+        if not unlocked(request):
+            raise HTTPException(401, "Locked.")
+        if not busy.acquire(blocking=False):
+            raise HTTPException(429, "Another question is running. Try again in a moment.")
+        try:
+            from wfp_agent import example as fixed
+            return JSONResponse(json.loads(json.dumps(fixed.build(), ensure_ascii=False, default=str)))
+        except FileNotFoundError:
+            raise HTTPException(503, "The agent's tables are not built: run python build_agent_data.py.") from None
+        finally:
+            busy.release()
+
+    @app.post("/api/feedback")
+    def feedback(body: Feedback, request: Request):
+        """An opinion on one answer, kept on this computer to find weak answers and new eval questions."""
+        if not unlocked(request):
+            raise HTTPException(401, "Locked.")
+        if len(body.comment) > tools.LIMITS["feedback_comment_chars"]:
+            raise HTTPException(400, f"Keep the comment under {tools.LIMITS['feedback_comment_chars']} characters.")
+        row = {"at": datetime.now(UTC).isoformat(timespec="seconds"), **body.model_dump()}
+        row["question"], row["answer"] = row["question"][:tools.LIMITS["max_question_chars"]], row["answer"][:20000]
+        with feedback_lock:
+            state.mkdir(parents=True, exist_ok=True)
+            with open(state / "feedback.jsonl", "a", encoding="utf-8") as f:
+                f.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
+        return {"ok": True}
 
     @app.post("/api/chat/stream")
     def chat(body: Chat, request: Request):
@@ -138,6 +236,10 @@ def create_app(password: str = "", agent_factory: Callable = default_agent_facto
             raise HTTPException(400, f"Ask a question of 1 to {tools.LIMITS['max_question_chars']} characters.")
         if not busy.acquire(blocking=False):
             raise HTTPException(429, "Another question is running. Try again in a moment.")
+        if not count.take():
+            busy.release()
+            raise HTTPException(429, f"Today's limit of {tools.LIMITS['questions_per_day']} questions is reached. It resets tomorrow; "
+                                     "the fixed example still works.")
         events: queue.Queue = queue.Queue()
 
         def work():

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 (2026-11-11)
+
+Ideas from the riapa.ai web app.
+
+- **Added:** a caution on the welcome page: the figures are unweighted and preliminary, not forecasts and not official WFP results, and they describe changes without explaining them.
+- **Added:** a fixed example, written by the server from the tables with no model and no API key (`wfp_agent/example.py`), with its chart, check of the figures, sources and trace.
+- **Added:** "How it works" and "Rounds and data" pages: how an answer is made and checked, how to read the figures, the limits, the data version, the rounds and the tools.
+- **Added:** an opinion (useful or not, with a comment) under each answer, kept in `local/feedback.jsonl` on this computer to find weak answers and new eval questions.
+- **Added:** a limit of questions per day (`questions_per_day` in `limits.json`, 100), counted in `local/usage.json` so a restart does not reset it. The example does not count.
+- **Fixed:** the agent trusts the system's certificates, so the API is reached behind networks that inspect HTTPS, such as CGIAR's.
+
 ## 0.4.0 (2026-11-11)
 
 Design ideas from IFPRI's RIAPA-AI (Discussion Paper 2424, 2026).

@@ -10,5 +10,7 @@
   "max_history_chars": 8000,
   "concurrent_questions": 1,
   "unlock_attempts_per_minute": 5,
-  "session_hours": 12
+  "session_hours": 12,
+  "questions_per_day": 100,
+  "feedback_comment_chars": 1000
 }

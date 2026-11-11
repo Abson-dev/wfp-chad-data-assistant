@@ -28,6 +28,12 @@
       <div class="counter"><div><strong>Tool calls</strong><span id="tool-note">None in this chat</span></div><b id="tool-count">0</b></div>
       <h2 class="side-title">History</h2>
       <ul id="history" class="history"></ul>
+      <nav class="side-nav" aria-label="About the assistant">
+        <button type="button" data-open="example">See an example</button>
+        <button type="button" data-open="how">How it works</button>
+        <button type="button" data-open="rounds">Rounds and data</button>
+      </nav>
+      <p id="usage" class="usage"></p>
       <p class="side-foot">Aggregates and metadata only: no household records are sent. Figures are unweighted and preliminary, not official WFP results. AI can make mistakes: check the sources under each answer.</p>
     </aside>
 
@@ -37,7 +43,17 @@
         <p id="kicker" class="kicker">WFP Chad resilience surveys, 2018–2023</p>
         <h1>Ask how the data were merged, and what they show.</h1>
         <p class="lead">A sourced answer, a chart, and the table behind it. English or French.</p>
+        <p class="caution">The figures describe the households surveyed in WFP programme areas. They are unweighted and preliminary: not forecasts, not official WFP results, and they describe changes without explaining them. Check the sources under each answer.</p>
+        <p class="welcome-links">
+          <button type="button" class="link" data-open="example">See an example (no API key)</button>
+          <button type="button" class="link" data-open="how">How it works</button>
+          <button type="button" class="link" data-open="rounds">Rounds and data</button>
+        </p>
         <div id="examples" class="examples"></div>
+      </section>
+      <section id="info" class="info" hidden>
+        <button id="info-back" type="button" class="link back">← Back to the chat</button>
+        <div id="info-body"></div>
       </section>
       <section id="thread" class="thread" aria-live="polite"></section>
       <form id="ask" class="ask">
@@ -47,6 +63,29 @@
       </form>
     </main>
   </div>
+  <template id="how-it-works">
+    <h2>How it works</h2>
+    <p>The assistant answers from the <strong>aggregate tables of the dashboard</strong> of the merging repository, built from <span data-fill="merged_file">the merged file</span>. It never sees a household record.</p>
+    <ol class="how-steps">
+      <li><strong>You ask</strong>, in English or French.</li>
+      <li><strong>The model chooses tools</strong>: read-only functions over the tables (indicators, regions, merge steps, variables, checks, data issues, costs). They compute the changes, gaps and rankings, so the model does no arithmetic.</li>
+      <li><strong>The model writes the answer</strong> from what the tools returned, under instructions that forbid inventing numbers or causes the tables do not measure.</li>
+      <li><strong>The server checks every figure</strong> of the answer against the tool results: green when all are found, orange with the list of those not found.</li>
+      <li><strong>You see the table and the chart</strong> behind the answer, checked by the server (a line never joins lean-season and post-harvest rounds), its sources, a link to the dashboard page, and a trace you can download.</li>
+    </ol>
+    <h3>Read the figures with care</h3>
+    <ul>
+      <li>Unweighted: they describe the households surveyed, not the population of Chad or of a region.</li>
+      <li>No panel: the samples and the regions covered change between rounds. No difference is tested for significance.</li>
+      <li>Compare annual with annual and PDM with PDM: the seasons differ.</li>
+      <li>Regional cells under 30 households are hidden. Known defects are flagged, with their reason.</li>
+      <li>The tables describe; they do not explain. The programme's effect needs the household data, as the cost-benefit analysis will do.</li>
+      <li>AI can make mistakes. Check the figures marked as not found, and the sources.</li>
+    </ul>
+    <h3>Limits and privacy</h3>
+    <p>Each question uses at most <span data-fill="max_tool_rounds">12</span> tool rounds and <span data-fill="seconds_per_question">180</span> seconds, and this computer allows <span data-fill="questions_per_day">100</span> questions a day. Regional aggregates are sent to the Anthropic API to answer; the chat history stays in this browser. Your opinions on the answers stay on this computer.</p>
+    <p class="muted">The design takes its main ideas from IFPRI's RIAPA-AI: the narrative bound to the numbers the tools compute, checked figures, downloadable traces and blind expert grading (Mukashov et al., 2026, IFPRI Discussion Paper 2424).</p>
+  </template>
   <script src="/static/chart.js"></script>
   <script src="/static/app.js"></script>
 </body>
