@@ -11,6 +11,17 @@ import anthropic
 
 from . import __version__, grounding, results, tools
 
+# Trust the certificates of the operating system, not only Python's own list: on networks that inspect HTTPS
+# (CGIAR's Cato Networks, Zscaler...) the API's certificate is signed by the network's root, which Windows trusts.
+# Certificates are still verified. WFP_AGENT_SYSTEM_CERTS=false turns it off.
+if os.environ.get("WFP_AGENT_SYSTEM_CERTS", "true").lower() != "false":
+    try:
+        import truststore
+
+        truststore.inject_into_ssl()
+    except ImportError:
+        pass
+
 MODEL = os.environ.get("WFP_AGENT_MODEL", "claude-opus-5-5")
 # Claude Opus 5.5 defaults to medium effort; set it explicitly. Thinking is adaptive (always on for this model).
 EFFORT = os.environ.get("WFP_AGENT_EFFORT", "high")

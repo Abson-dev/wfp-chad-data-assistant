@@ -14,6 +14,7 @@ dependencies:
       - anthropic==2.3.0
       - fastapi==0.115.0    # web app (web)
       - uvicorn==0.30.6
+      - truststore==0.10.5
       - httpx==0.27.2       # tests of the web app
       - playwright==1.48.0  # tests of the browser client, with the Chrome already on the machine
       - ruff==0.6.9
