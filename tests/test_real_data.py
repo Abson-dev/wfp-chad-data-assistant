@@ -26,10 +26,13 @@ def test_national_figures_match_the_dashboard():
     assert (ind["as_merged"] - d["fcs_pb_m"].reindex(ind.index)).abs().max() < 1e-9
 
 
-def test_the_known_coping_defect_is_flagged():
+def test_the_coping_defects_are_fixed_in_v9():
     ind = pd.read_csv(tools.DATA / "indicators.csv")
-    r = ind.query("indicator == 'lcs_em' and breakdown == 'national' and round_id == 'R10'").iloc[0]
-    assert r["flagged"] and r["as_merged"] > 5 * r["with_corrections"]
+    em = ind.query("indicator == 'lcs_em' and breakdown == 'national'").set_index("round_id")
+    assert (em.loc[["R01", "R03", "R10"], "as_merged"].round(1) == [21.2, 8.5, 5.8]).all()
+    assert not em.loc[["R01", "R03", "R10"], "flagged"].any() and em.loc["R02", "flagged"]
+    abi = ind.query("indicator == 'abi_mean' and breakdown == 'national' and round_id == 'R08'").iloc[0]
+    assert round(abi["as_merged"], 1) == 5.8 and not abi["flagged"]
 
 
 def test_rounds_and_series():

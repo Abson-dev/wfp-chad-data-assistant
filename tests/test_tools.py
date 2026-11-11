@@ -28,10 +28,13 @@ def test_list_indicators_filters_by_domain():
 
 
 def test_indicator_gives_both_figures_and_the_flag(rows):
-    t, _ = rows(tools.get_indicator, indicator="lcs_em", rounds="2023 Annual")
-    r = t.iloc[0]
-    assert len(t) == 1 and bool(r["flagged"]) and isinstance(r["flag_reason"], str)
-    assert r["as_merged"] != r["with_corrections"]
+    # Works on the invented data (2023 Annual flagged and corrected) and on the real data (fixed in v9).
+    t, _ = rows(tools.get_indicator, indicator="lcs_em")
+    assert t["flagged"].any() and t.loc[t["flagged"], "flag_reason"].map(lambda s: isinstance(s, str)).all()
+    differ = (t["as_merged"] - t["with_corrections"]).abs() > 1e-9
+    assert t.loc[differ, "flagged"].all()
+    one, _ = rows(tools.get_indicator, indicator="lcs_em", rounds="2023 Annual")
+    assert len(one) == 1
     ok, _ = rows(tools.get_indicator, indicator="fcs_pb", rounds="R06")
     assert not ok["flagged"].iloc[0] and ok["as_merged"].iloc[0] == ok["with_corrections"].iloc[0]
 
@@ -205,8 +208,10 @@ def test_merge_status_overall_and_by_module(rows):
 
 
 def test_validation_checks(rows):
-    t, text = rows(tools.get_validation_checks, status="fail")
-    assert len(t) and set(t["status"]) == {"fail"} and "All checks" in text
+    # The real data may have no failing check left: test a status that exists.
+    status = "fail" if tools.get_validation_checks.call({"status": "fail"}).startswith("result_id:") else "warn"
+    t, text = rows(tools.get_validation_checks, status=status)
+    assert len(t) and set(t["status"]) == {status} and "All checks" in text
     assert "Groups:" in tools.get_validation_checks.call({"group": "zzz"})
 
 

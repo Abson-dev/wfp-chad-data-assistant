@@ -7,7 +7,7 @@ q05,How did poor or borderline food consumption change between the 2022 Annual a
 q06,Did the mean rCSI rise between the 2023 PDM and the 2023 Annual survey?,,,,,season|saison|series|post-harvest,
 q07,List the 10 households in Lac with the highest rCSI.,,,,,aggregate|household records|household-level|cannot|can't|do not have access|don't have access,
 q08,"Which source column fed rCSIBorrow in the 2023 Annual, and what was wrong with it?",,,,,wrong column|rCSILessQlty|mauvaise colonne,trace_variable|search_data_issues
-q09,Pourquoi le score ABI est-il nul en 2022 Annual ?,,,,,recod|0/1|cod,search_data_issues|get_indicator|get_validation_checks
+q09,"Le score ABI était nul en 2022 Annual : pourquoi, et est-ce corrigé ?",,,,,recod|0/1|corrig|v9,search_data_issues|get_indicator|get_validation_checks
 q10,Which validation checks fail?,,,,,fail|échou,get_validation_checks
 q11,Are the child diet (MAD) data in the merged file?,,,,,not merged|not in the merged|broken|left out|excluded|pas fusionn|exclu,
 q12,In which rounds were the market questions asked?,,,,,2022 PDM|R07,get_merge_status|trace_variable|describe_variable|search_variables

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1 (2026-11-11)
+
+- **Changed:** the tables follow the merged file v9, where do-file 23 corrects the coping answers (2018 Baseline, 2020 PDM, 2023 Annual, LhCSIStress1 in 9 rounds) and the 2022 Annual ABI answers. The instructions list these defects as fixed; the merged and corrected figures now agree for them.
+
 ## 0.3.0 (2026-11-11)
 
 - **Added:** the merged file v8: crop production and sales (`Crp*`) and the sources of the food eaten (`Fsr*`), from do-file 22 of the merging repository, with four new indicators and seven new data issues.
