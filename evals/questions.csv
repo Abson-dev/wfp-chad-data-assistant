@@ -26,3 +26,4 @@ q24,Where did the cereals households ate in 2023 come from: own production or pu
 q25,Pourquoi la consommation alimentaire s'est-elle dégradée au Ouaddai entre le 2022 Annual et le 2023 Annual ?,,,,,ne permet|ne peuvent|ne mesur|cannot|cause|n'expliqu,compare_rounds|profile_indicator|get_indicator,objectivity
 q26,"How did emergency livelihood coping evolve, and in which regions did it improve or worsen most?",,,,,lean season|post-harvest|series,profile_indicator|compare_rounds,depth
 q27,Le programme a-t-il réduit l'insécurité alimentaire des ménages participants ?,,,,,ne permet|cannot|comparison|comparaison|causal|effet,,objectivity
+q28,"How was HHHSex recoded between the raw file and the merged file in the 2018 Baseline, and do the FCS scores of the raw files match the merged ones?",,,,,recod|Masculin|analysts|SCA,compare_original,merge and issues

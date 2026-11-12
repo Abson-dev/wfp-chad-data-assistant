@@ -48,7 +48,7 @@ Everything built from the invented dashboard is labelled synthetic, in the tools
 flowchart LR
   A["Merged file<br/>(17,255 households)"] -->|"prepare_app_data.R<br/>(dashboard, runs locally)"| B["Dashboard aggregates<br/>cells under 30 suppressed"]
   B -->|"build_agent_data.py"| C["data/<br/>aggregates and metadata"]
-  C --> D["17 read-only tools"]
+  C --> D["18 read-only tools"]
   D <--> E["Claude"]
   D -->|"publish_result:<br/>checked by the server"| F["Chart, table, CSV,<br/>sources"]
   E --> F
@@ -96,6 +96,7 @@ In the web app, the welcome page and the side bar also give:
 | About | Tool | Gives |
 |---|---|---|
 | **The merge** | `trace_variable` | For a variable and each round: the source column, type, coverage, question and value labels, and the share of households whose merged value equals the raw one |
+| | `compare_original` | WFP's raw files against the merged file on the same households: scores recomputed from the raw items, each variable's statistics on both sides, and how each raw code became a merged code |
 | | `describe_variable` | The distribution of a column of the merged file by round |
 | | `search_variables` | Columns and workbook variables by name or label, in English or French, accents ignored |
 | | `get_merge_status` | Each merge step (rows, matches, columns added), or the households a module reaches in each round |

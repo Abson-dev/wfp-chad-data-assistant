@@ -257,6 +257,40 @@ def write_app(app: Path) -> None:
     w(pd.DataFrame(vals, columns=["variable", "round_id", "value", "label", "households", "answered", "pct", "suppressed"]), "variable_values.csv")
     w(pd.DataFrame(nums, columns=["variable", "round_id", "answered", "mean", "p10", "median", "p90", "min", "max"]), "variable_numeric.csv")
     w(pd.DataFrame(agree, columns=["variable", "family", "round_id", "compared", "same", "pct_same"]), "source_agreement_variable.csv")
+
+    # The original files against the merged file (the dashboard's Original vs merged page).
+    src_of = {v: s for v, _, _, _, _, _, s in VARIABLES}
+    ovm = []
+    for var, fam, rid, n, same, pct in agree:
+        m = round(float(rng.uniform(1, 40)), 3)
+        differ = pct < 100
+        ovm.append({"round_id": rid, "variable": var, "family": fam, "workbook": "First harmonisation", "raw_column": src_of[var],
+                    "raw_rows_answered": n, "raw_answered": n, "merged_answered": n, "raw_mean": round(m * (1.3 if differ else 1), 3),
+                    "merged_mean": m, "raw_median": round(m), "merged_median": round(m), "raw_min": 0, "merged_min": 0,
+                    "raw_max": round(m * 3), "merged_max": round(m * 3), "compared": n, "same_value": same, "pct_same": pct,
+                    "status": "Values differ: recoded on purpose, or a defect" if differ else "Identical"})
+    w(pd.DataFrame(ovm), "original_vs_merged_variables.csv")
+    codes = []
+    for var, rid, code, clab, k, _, _, _ in vals:
+        try:
+            c = float(code)
+        except ValueError:
+            continue
+        codes.append({"round_id": rid, "variable": var, "raw_code": c, "raw_label": clab, "merged_code": c, "merged_label": clab,
+                      "households": k if k >= 5 else None, "raw_code_total": k if k >= 5 else None, "merged_code_total": k if k >= 5 else None,
+                      "pct_of_raw_code": 100.0 if k >= 5 else None, "same_code": True, "suppressed": k < 5})
+    w(pd.DataFrame(codes), "original_vs_merged_categories.csv")
+    scores = []
+    for rid in RIDS:
+        n = int(per_round[rid])
+        for ind, unit, lo, hi in (("Mean FCS", "score", 35, 60), ("Poor + borderline FCS (28/42)", "%", 20, 60), ("Mean rCSI", "score", 3, 12)):
+            v = round(float(rng.uniform(lo, hi)), 3)
+            fixed = rid == "R03" and "FCS" in ind
+            raw = round(v * 0.3, 3) if fixed else v
+            scores.append({"round_id": rid, "indicator": ind, "unit": unit, "raw_households": n, "raw_value": raw, "merged_households": n,
+                           "merged_value": v, "difference": round(v - raw, 3),
+                           "note": "Fixed on purpose: the merged FCS takes the analysts' SCA (do-file 15)." if fixed else "Same."})
+    w(pd.DataFrame(scores), "original_vs_merged_indicators.csv")
     w(pd.DataFrame([(v, f, lab, len(asked), kind, "text" if kind == "hidden" else "numeric",
                      round(100 * sum(per_round[r] for r in asked) / total, 1), vl) for v, f, lab, kind, vl, asked, _ in VARIABLES],
                    columns=["variable", "family", "label", "rounds_with_data", "kind", "type", "coverage", "value_labels"]), "merged_columns.csv")

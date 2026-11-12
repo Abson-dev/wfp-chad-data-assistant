@@ -174,6 +174,24 @@ def test_trace_an_input_that_is_not_kept(rows):
     assert "not kept in the merged file" in text
 
 
+def test_compare_original_scores_and_status(rows):
+    t, text = rows(tools.compare_original)
+    assert {"raw_value", "merged_value", "difference", "note"} <= set(t.columns) and set(t["round_id"]) == set(tools._table("rounds.csv")["round_id"])
+    assert "Identical:" in text and "variable-rounds" in text
+
+
+def test_compare_original_one_variable_and_its_codes(rows):
+    t, _ = rows(tools.compare_original, variable="hhhsex")
+    assert {"raw_mean", "merged_mean", "pct_same", "status"} <= set(t.columns) and t["round_id"].is_unique
+    codes, text = rows(tools.compare_original, variable="HHHSex", round_id="R10")
+    assert {"raw_code", "merged_code", "households", "same_code"} <= set(codes.columns) and "R10" in text
+
+
+def test_compare_original_refuses_unknown_and_identifiers():
+    assert tools.compare_original.call({"variable": "village"}).startswith("No comparison")
+    assert tools.compare_original.call({"variable": "zzznope"}).startswith("No comparison")
+
+
 def test_describe_categorical_numeric_and_hidden(rows):
     cat, _ = rows(tools.describe_variable, variable="HHHSex", round_id="R10")
     assert {"value", "label", "pct", "pct_answered"} <= set(cat.columns) and set(cat["round_id"]) == {"R10"}

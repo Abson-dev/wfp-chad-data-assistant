@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0 (2026-11-12)
+
+- **Added:** `compare_original`, the dashboard's new Original vs merged page: WFP's raw files against the merged file on the same households. With no variable, FCS and rCSI recomputed from the raw items against the merged scores, and the status of every variable by round; with a variable, its answers, mean, median and range on both sides; with a variable and a round, how each raw code became a merged code.
+- **Changed:** the instructions say that a variable whose values differ is mostly recoded on purpose, and to check the issue register before calling it a defect. One eval question on it.
+
 ## 0.6.0 (2026-11-11)
 
 Individual accounts, for security.

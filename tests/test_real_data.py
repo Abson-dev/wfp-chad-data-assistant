@@ -39,3 +39,13 @@ def test_rounds_and_series():
     r = pd.read_csv(tools.DATA / "rounds.csv")
     assert len(r) == 10 and r["final_rows"].sum() == 17255
     assert set(r.loc[r["survey"] == "PDM", "series"]) == {"Lean season"}
+
+
+def test_original_against_merged_on_the_real_tables(rows):
+    t, text = rows(tools.compare_original)
+    fcs = t[(t["round_id"] == "R03") & (t["indicator"] == "Mean FCS")].iloc[0]
+    assert "analysts" in fcs["note"] and abs(fcs["merged_value"] - 53.2) < 0.1
+    assert not (t["note"] == "Unexplained difference.").any()
+    codes, _ = rows(tools.compare_original, variable="HHHSex", round_id="R01")
+    recode = codes[codes["raw_code"] == 1].iloc[0]
+    assert recode["merged_code"] == 2 and not recode["same_code"]

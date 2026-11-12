@@ -38,7 +38,8 @@ DASHBOARD_PAGES = {
     "compare_rounds": ("trends", "Trends"), "profile_indicator": ("trends", "Trends"),
     "rank_regions": ("regions", "Regions"), "relate_indicators": ("regions", "Regions"),
     "get_assistance": ("assistance", "Assistance"), "get_costs": ("costs", "Costs"), "get_household_costs": ("costs", "Costs"),
-    "trace_variable": ("crosswalk", "Crosswalk"), "describe_variable": ("variables", "Variables"), "search_variables": ("variables", "Variables"),
+    "trace_variable": ("crosswalk", "Crosswalk"), "compare_original": ("original", "Original vs merged"),
+    "describe_variable": ("variables", "Variables"), "search_variables": ("variables", "Variables"),
     "get_merge_status": ("merge", "Merge"), "get_validation_checks": ("validation", "Validation"), "search_data_issues": ("issues", "Data issues"),
 }
 
@@ -518,6 +519,64 @@ def trace_variable(variable: str, round_id: str = "") -> str:
 
 @beta_tool
 @_keep
+def compare_original(variable: str = "", round_id: str = "") -> str:
+    """Compare WFP's original (raw SPSS) files with the merged file, on the same households, as the dashboard's
+    Original vs merged page does.
+    - No variable: FCS and rCSI recomputed from the raw items against the merged scores, by round, with the reason for
+      any difference; and how many variables are identical, keep their values with other answers, or differ, by round.
+    - A variable: for each round, the raw column, answers, mean, median, min and max on both sides, the share of
+      households with the same value, and a status.
+    - A variable and one round: how each raw code became a merged code (households per pair; blank under 5).
+    A status "Values differ" is mostly a recode on purpose (codes put on one scale); search_data_issues says when it is
+    a defect. Means of coded variables compare codes, not quantities.
+
+    Args:
+        variable: Harmonised variable, e.g. HHHSex, FCSStap, LhCSIStress1. Empty = the scores and the status summary.
+        round_id: Optional round, e.g. "R10" or "2023 Annual"; with a variable, gives the code table of that round.
+    """
+    call = _log("compare_original", variable=variable, round_id=round_id)
+    rounds = _table("rounds.csv")[["round_id", "round"]]
+    ov = _table("original_vs_merged.csv")
+    rid = _round_ids(round_id)
+    if not variable.strip():
+        sc = rounds.merge(_table("original_vs_merged_scores.csv"), on="round_id")
+        if rid:
+            sc = sc[sc["round_id"].isin(rid)]
+        counts = ov.groupby("status").size().sort_values(ascending=False)
+        head = ("# Scores recomputed from the raw items through the workbook, against the merged file. Status of all "
+                f"{len(ov)} variable-rounds: " + "; ".join(f"{k}: {v}" for k, v in counts.items()) + ".\n")
+        cols = ["round_id", "round", "indicator", "unit", "raw_households", "raw_value", "merged_households", "merged_value", "difference", "note"]
+        return _result(sc[cols], call, "Scores from the original files against the merged file", head)
+    want = variable.strip().lower()
+    rows = ov[ov["variable"].str.lower() == want]
+    if rows.empty:
+        near = [n for n in sorted(set(ov["variable"])) if _plain(variable)[:4] in _plain(n)][:12]
+        return f"No comparison for '{variable}'. Similar names: {near}. Identifiers, places and GPS are not compared."
+    name = rows["variable"].iloc[0]
+    if len(rid) == 1:
+        codes = _table("original_vs_merged_codes.csv")
+        codes = codes[(codes["variable"] == name) & (codes["round_id"] == rid[0])]
+        stat = rows[rows["round_id"] == rid[0]]
+        st = stat["status"].iloc[0] if len(stat) else "not compared in this round"
+        if codes.empty:
+            return (f"No code table for {name} in {rid[0]} (status: {st}): it is not coded with value labels there, or it "
+                    "has more than 40 values. Call compare_original with the variable alone for its statistics.")
+        head = (f"# {name}, {rid[0]}: status {st}. One row per pair of raw code and merged code; households blank under 5; "
+                "same_code False = recoded.\n")
+        cols = ["raw_code", "raw_label", "merged_code", "merged_label", "households", "pct_of_raw_code", "same_code"]
+        return _result(codes[cols], call, f"How the codes of {name} were merged, {rid[0]}", head)
+    out = rounds.merge(rows, on="round_id")
+    if rid:
+        out = out[out["round_id"].isin(rid)]
+    cols = ["round_id", "round", "raw_column", "raw_answered", "merged_answered", "raw_mean", "merged_mean", "raw_median",
+            "merged_median", "raw_min", "merged_min", "raw_max", "merged_max", "pct_same", "status"]
+    head = (f"# {name} ({rows['family'].iloc[0]}): the raw file's values for the households of the merged file against the "
+            "merged values. Raw codes are as they are in the raw file.\n")
+    return _result(out[cols], call, f"{name}: original against merged", head)
+
+
+@beta_tool
+@_keep
 def describe_variable(variable: str, round_id: str = "") -> str:
     """The distribution of a column of the merged file by round: answer counts and shares for a categorical variable
     (counts under 5 households are hidden), or mean, 10th/50th/90th percentiles, min and max for a numeric one;
@@ -704,5 +763,5 @@ def build_info() -> dict:
 
 TOOLS = [list_indicators, list_rounds, get_indicator, profile_indicator, compare_rounds, rank_regions, relate_indicators,
          get_assistance, get_costs, get_household_costs,
-         trace_variable, describe_variable, search_variables, get_merge_status, get_validation_checks, search_data_issues,
+         trace_variable, compare_original, describe_variable, search_variables, get_merge_status, get_validation_checks, search_data_issues,
          publish_result]
