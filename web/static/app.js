@@ -1,17 +1,14 @@
 // Browser client. Text from the model and the data goes through textContent only: nothing it says runs as HTML.
 (function () {
   const $ = (id) => document.getElementById(id);
-  const KEY = "wfp-agent-chats";
   const EXAMPLES = [
     ["Trace a variable", "How was rCSIBorrow merged across the rounds, and what was wrong with it?"],
     ["Check the data", "Which validation checks fail, and which data issues are still open?"],
     ["Follow a trend", "How has poor or borderline food consumption changed across the annual surveys?"],
     ["Compare regions", "Quelles régions ont le plus souffert de chocs au cours des 12 derniers mois en 2023 ?"],
   ];
-  let chats = load(), current = null, running = false;
-
-  function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(chats.slice(0, 30), (k, v) => (k === "tool_outputs" ? undefined : v))); } catch (e) { /* the chat still works without saved history */ } }
+  // chats: the account's chat list from the server; current: the open chat {id, title, turns}.
+  let chats = [], current = null, running = false, limits = {};
   function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
 
   // Small safe renderer: headings, lists, tables, bold and inline code, built as DOM nodes.
@@ -137,10 +134,11 @@
     return b;
   }
 
-  // An opinion on the answer: kept on this computer, to find weak answers and new eval questions.
-  function feedbackBox(entry) {
+  // An opinion on the answer: kept with the account on the server, to find weak answers and new eval questions.
+  function feedbackBox(entry, index) {
     const box = el("div", "feedback");
     if (entry.feedback) { box.append(el("span", "muted", "Thank you: your opinion was saved.")); return box; }
+    if (!current || !current.id) return box;
     box.append(el("span", "", "Was this answer useful?"));
     const comment = el("textarea");
     comment.rows = 2; comment.maxLength = 1000; comment.hidden = true;
@@ -161,17 +159,16 @@
     });
     send.onclick = async () => {
       send.disabled = true;
-      const body = { question: entry.question, answer: entry.text || "", rating, comment: comment.value.trim(), tool_calls: entry.tool_calls || [],
-        grounding: entry.grounding || {}, provenance: entry.provenance || {}, example: !!entry.example };
+      const body = { chat_id: current.id, turn: index, rating, comment: comment.value.trim() };
       const res = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
-      if (res && res.ok) { entry.feedback = rating; save(); box.replaceWith(feedbackBox(entry)); }
+      if (res && res.ok) { entry.feedback = rating; box.replaceWith(feedbackBox(entry, index)); }
       else { send.disabled = false; box.append(el("span", "error", " Not saved, try again.")); }
     };
     box.append(comment, send);
     return box;
   }
 
-  function renderTurn(entry) {
+  function renderTurn(entry, index) {
     const turn = el("article", "turn");
     turn.append(el("div", "q", entry.question));
     if (entry.example) turn.append(el("p", "example-tag", "Example · written by the server from the tables, no model"));
@@ -206,7 +203,7 @@
       if (g) a.append(g);
       a.append(sources(entry));
       if (entry.tool_calls && entry.tool_calls.length) a.append(traceButton(entry));
-      a.append(feedbackBox(entry));
+      a.append(feedbackBox(entry, index));
     }
     turn.append(a);
     return turn;
@@ -216,10 +213,13 @@
     const ul = $("history");
     ul.textContent = "";
     chats.forEach((c) => {
-      const li = el("li"), b = el("button", c === current ? "active" : "", c.title);
+      const li = el("li"), b = el("button", current && c.id === current.id ? "active" : "", c.title);
       b.type = "button";
-      b.onclick = () => { if (!running) { current = c; paintAll(); } };
-      li.append(b); ul.append(li);
+      b.onclick = () => openChat(c.id);
+      const del = el("button", "delete", "×");
+      del.type = "button"; del.title = "Delete this chat"; del.setAttribute("aria-label", `Delete the chat ${c.title}`);
+      del.onclick = () => deleteChat(c);
+      li.append(b, del); ul.append(li);
     });
     const n = current ? current.turns.reduce((s, t) => s + (t.tool_calls || []).length, 0) : 0;
     $("tool-count").textContent = n;
@@ -231,18 +231,39 @@
     const thread = $("thread");
     thread.textContent = "";
     $("welcome").hidden = !!(current && current.turns.length);
-    if (current) current.turns.forEach((t) => thread.append(renderTurn(t)));
+    if (current) current.turns.forEach((t, i) => thread.append(renderTurn(t, i)));
     paintSidebar();
     thread.lastElementChild && thread.lastElementChild.scrollIntoView({ block: "start" });
   }
 
+  // The chats are kept with the account on the server; the browser keeps nothing.
+  async function api(path, options) {
+    const res = await fetch(path, options);
+    if (res.status === 401) { boot(); throw new Error("Your session has ended: sign in again."); }
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.detail || `The server answered ${res.status}.`);
+    return j;
+  }
+  async function loadChats() { chats = await api("/api/chats").catch(() => []); paintSidebar(); }
+  async function openChat(id) {
+    if (running) return;
+    try { current = await api(`/api/chats/${encodeURIComponent(id)}`); } catch (e) { current = null; }
+    paintAll();
+  }
+  async function deleteChat(c) {
+    if (running || !window.confirm(`Delete the chat "${c.title}"?`)) return;
+    await api(`/api/chats/${encodeURIComponent(c.id)}`, { method: "DELETE" }).catch(() => null);
+    if (current && current.id === c.id) current = null;
+    await loadChats();
+    paintAll();
+  }
+
   async function ask(question) {
     if (running) return;
-    if (!current) { current = { title: question.slice(0, 60), turns: [] }; chats.unshift(current); }
+    if (!current) current = { id: null, title: question.slice(0, 60), turns: [] };
     running = true;
     $("send").disabled = true;
     $("welcome").hidden = true; $("info").hidden = true; $("thread").hidden = false;
-    const history = current.turns.flatMap((t) => (t.error ? [] : [{ role: "user", content: t.question }, { role: "assistant", content: t.text || "(no text)" }]));
     const live = el("article", "turn");
     live.append(el("div", "q", question));
     const steps = el("ol", "steps");
@@ -252,7 +273,8 @@
     live.scrollIntoView({ block: "start" });
     const entry = { question, tool_calls: [] };
     try {
-      const res = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, history }) });
+      const res = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, chat_id: current.id }) });
+      if (res.status === 401) { boot(); throw new Error("Your session has ended: sign in again."); }
       if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.detail || `The server answered ${res.status}.`); }
       const reader = res.body.getReader(), dec = new TextDecoder();
       let buf = "";
@@ -266,9 +288,8 @@
           if (!line.startsWith("data: ")) continue;
           const ev = JSON.parse(line.slice(6));
           if (ev.type === "tool") { steps.append(el("li", "", `${ev.tool} ${Object.values(ev.args || {}).join(" · ")}`)); $("tool-count").textContent = Number($("tool-count").textContent) + 1; }
-          if (ev.type === "answer") Object.assign(entry, { text: ev.text, published: ev.published, tool_calls: ev.tool_calls, grounding: ev.grounding,
-            provenance: ev.provenance, tool_outputs: ev.tool_outputs });
-          if (ev.type === "error") entry.error = ev.message;
+          if (ev.type === "answer") { const { type, chat_id, ...turn } = ev; Object.assign(entry, turn); current.id = chat_id; }
+          if (ev.type === "error") { entry.error = ev.message; current.id = ev.chat_id; }
         }
       }
       if (!entry.text && !entry.error) entry.error = "The connection closed before an answer arrived.";
@@ -276,13 +297,12 @@
       entry.error = e.message;
     }
     current.turns.push(entry);
-    save();
     refreshUsage();
     running = false;
     $("send").disabled = false;
     live.remove();
-    $("thread").append(renderTurn(entry));
-    paintSidebar();
+    $("thread").append(renderTurn(entry, current.turns.length - 1));
+    await loadChats();
     $("thread").lastElementChild.scrollIntoView({ block: "start" });
   }
 
@@ -298,14 +318,11 @@
     if (running) return;
     running = true;
     try {
-      const res = await fetch("/api/example");
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(j.detail || `The server answered ${res.status}.`);
-      current = { title: "Example: " + j.question.slice(0, 50), turns: [Object.assign(j, { example: true })] };
-      chats.unshift(current);
-      save();
+      const j = await api("/api/example", { method: "POST" });
+      current = { id: j.chat_id, title: "Example", turns: [j.turn] };
+      await loadChats();
     } catch (e) {
-      current = { title: "Example", turns: [{ question: "Example", error: e.message, tool_calls: [] }] };
+      current = { id: null, title: "Example", turns: [{ question: "Example", error: e.message, tool_calls: [] }] };
     }
     running = false;
     paintAll();
@@ -316,12 +333,12 @@
     const body = $("info-body");
     body.textContent = "";
     $("welcome").hidden = true; $("thread").hidden = true; $("info").hidden = false;
-    const about = await fetch("/api/about").then((r) => r.json()).catch(() => ({}));
-    const data = about.data || {}, limits = about.limits || {};
+    const about = await api("/api/about").catch(() => ({}));
+    const data = about.data || {}, lim = about.limits || {};
     if (kind === "how") {
       body.append($("how-it-works").content.cloneNode(true));
       body.querySelectorAll("[data-fill]").forEach((n) => {
-        const k = n.dataset.fill, v = data[k] !== undefined ? data[k] : limits[k];
+        const k = n.dataset.fill, v = data[k] !== undefined ? data[k] : lim[k];
         if (v !== undefined && v !== null) n.textContent = String(v);
       });
       return;
@@ -354,9 +371,23 @@
     if (kind === "example") showExample(); else showInfo(kind);
   }
 
+  function show(id) { ["lock", "change", "app"].forEach((x) => { $(x).hidden = x !== id; }); }
+
+  // The password form: required while the password is temporary, optional from the side bar.
+  function askNewPassword(required) {
+    show("change");
+    $("change-why").textContent = required ? "Your password is temporary: choose your own to continue." : "Change your password. Your other sessions will end.";
+    $("change-cancel").hidden = required;
+    $("pw-rule").textContent = `At least ${limits.password_min_chars || 10} characters, varied, without your email address.`;
+    ["pw-current", "pw-new", "pw-again"].forEach((x) => { $(x).value = ""; });
+    $("change-error").textContent = "";
+    $("pw-current").focus();
+  }
+
   function start(status) {
-    $("lock").hidden = true;
-    $("app").hidden = false;
+    show("app");
+    limits = status.limits || limits;
+    $("who").textContent = `${status.user.name} · ${status.user.email}`;
     const banner = $("banner");
     const notes = [];
     if (status.data && status.data.synthetic) notes.push("SYNTHETIC DEMO DATA: every value is invented.");
@@ -374,7 +405,9 @@
       box.append(b);
     });
     showUsage(status.usage);
+    current = null;
     paintAll();
+    loadChats();
   }
 
   document.querySelectorAll("[data-open]").forEach((b) => { b.onclick = () => open(b.dataset.open); });
@@ -384,14 +417,37 @@
   $("new-chat").onclick = () => { if (!running) { current = null; paintAll(); $("question").focus(); } };
   $("lock").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const res = await fetch("/api/unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: $("password").value }) });
-    if (res.ok) { $("password").value = ""; boot(); }
-    else { const j = await res.json().catch(() => ({})); $("lock-error").textContent = j.detail || "Could not unlock."; }
+    const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: $("email").value, password: $("password").value }) });
+    $("password").value = "";
+    if (res.ok) { $("lock-error").textContent = ""; boot(); }
+    else { const j = await res.json().catch(() => ({})); $("lock-error").textContent = j.detail || "Could not sign in."; }
   });
+  $("change").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if ($("pw-new").value !== $("pw-again").value) { $("change-error").textContent = "The two new passwords differ."; return; }
+    const res = await fetch("/api/password", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current: $("pw-current").value, new: $("pw-new").value }) });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok) { ["pw-current", "pw-new", "pw-again"].forEach((x) => { $(x).value = ""; }); boot(); }
+    else $("change-error").textContent = j.detail || "Could not change the password.";
+  });
+  $("change-open").onclick = () => askNewPassword(false);
+  $("change-cancel").onclick = () => show("app");
+  $("sign-out").onclick = async () => {
+    await fetch("/api/logout", { method: "POST" }).catch(() => null);
+    chats = []; current = null;
+    $("thread").textContent = "";
+    boot();
+  };
 
   async function boot() {
-    const status = await fetch("/api/status").then((r) => r.json());
-    if (status.locked) { $("app").hidden = true; $("lock").hidden = false; $("password").focus(); } else start(status);
+    const status = await fetch("/api/status").then((r) => r.json()).catch(() => ({ locked: true }));
+    if (status.locked) { show("lock"); $("email").focus(); }
+    else if (status.user.must_change) askNewPassword(true);
+    else start(status);
   }
+  // Chats saved in the browser by earlier versions: they now live with the account.
+  try { localStorage.removeItem("wfp-agent-chats"); } catch (e) { /* nothing to remove */ }
   boot();
 })();

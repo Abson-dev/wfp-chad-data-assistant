@@ -3,6 +3,7 @@ Skipped when Playwright or Chrome is not available."""
 import json
 import re
 import socket
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -11,6 +12,7 @@ import app as webapp
 import pytest
 import uvicorn
 from scripted_model import ScriptedClient
+from webutil import PASSWORD, add
 
 from wfp_agent.agent import WfpAgent
 
@@ -44,11 +46,14 @@ class Router(WfpAgent):
         return super().ask(question, on_event)
 
 
-def serve(password=""):
+def serve(must_change=False):
+    """A server with its own accounts in a temporary folder, and one account (ana@example.org)."""
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
-    server = uvicorn.Server(uvicorn.Config(webapp.create_app(password, Router), host="127.0.0.1", port=port, log_level="error"))
+    state = Path(tempfile.mkdtemp(prefix="wfp_browser_"))
+    acc = add(webapp.open_accounts(state), must_change=must_change)
+    server = uvicorn.Server(uvicorn.Config(webapp.create_app(acc, Router, state), host="127.0.0.1", port=port, log_level="error"))
     threading.Thread(target=server.run, daemon=True).start()
     for _ in range(100):
         if server.started:
@@ -78,9 +83,17 @@ def page(browser):
     p.on("console", lambda m: p.problems.append(m.text) if m.type == "error" else None)
     p.on("request", lambda r: p.outside.append(r.url) if not r.url.startswith((url, "data:", "blob:")) else None)
     p.goto(url)
+    sign_in(p)
     yield p
     context.close()
     server.should_exit = True
+
+
+def sign_in(p, password=PASSWORD):
+    p.wait_for_selector("#lock:not([hidden])")
+    p.fill("#email", "ana@example.org")
+    p.fill("#password", password)
+    p.click("#lock button[type=submit]")
 
 
 def ask(p, question):
@@ -93,7 +106,9 @@ def ask(p, question):
 
 
 def test_home_page_shows_examples_and_the_synthetic_label(page):
+    page.wait_for_selector("#app:not([hidden])")
     assert page.locator(".example").count() == 4
+    assert "Ana Test" in page.locator("#who").text_content()
     assert page.locator("#welcome").is_visible()
     if "SYNTHETIC" in (page.locator("#banner").text_content() or ""):
         assert "households" in page.locator("#kicker").text_content()
@@ -208,18 +223,37 @@ def test_no_horizontal_scroll_on_a_phone(page):
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 
 
-def test_lock_screen(browser):
-    server, url = serve(password="s3cret")
+def test_sign_in_a_temporary_password_and_sign_out(browser):
+    server, url = serve(must_change=True)
     context = browser.new_context()
     p = context.new_page()
     p.goto(url)
-    p.wait_for_selector("#lock")
-    assert not p.locator("#app").is_visible()
-    p.fill("#password", "wrong")
-    p.click("#lock button")
+    sign_in(p, password="wrong-password")
     p.locator("#lock-error:not(:empty)").wait_for()
-    p.fill("#password", "s3cret")
-    p.click("#lock button")
+    assert not p.locator("#app").is_visible()
+    sign_in(p)
+    p.wait_for_selector("#change:not([hidden])")
+    assert p.locator("#change-cancel").is_hidden() and not p.locator("#app").is_visible()
+    p.fill("#pw-current", PASSWORD)
+    p.fill("#pw-new", "A-much-better-pass-7")
+    p.fill("#pw-again", "A-different-pass-8")
+    p.click("#change button[type=submit]")
+    assert "differ" in p.locator("#change-error").text_content()
+    p.fill("#pw-again", "A-much-better-pass-7")
+    p.click("#change button[type=submit]")
     p.wait_for_selector("#app:not([hidden])")
+    p.click("#sign-out")
+    p.wait_for_selector("#lock:not([hidden])")
+    assert p.locator(".turn").count() == 0
     context.close()
     server.should_exit = True
+
+
+def test_chats_come_back_after_signing_in_again(page):
+    ask(page, "merged")
+    page.click("#sign-out")
+    sign_in(page)
+    page.wait_for_selector(".history li")
+    page.locator(".history li button").first.click()
+    page.locator(".turn").first.wait_for()
+    assert page.locator(".turn").count() == 1 and not page.problems

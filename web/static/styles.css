@@ -140,3 +140,16 @@ button.link:hover { color: var(--navy); }
 .feedback textarea { flex: 1 1 100%; padding: .4rem .6rem; border: 1px solid var(--grid); border-radius: 6px; resize: vertical; }
 .feedback .small { padding: .25rem .8rem; background: var(--teal); color: #fff; border: 0; border-radius: 6px; font-weight: 650; }
 @media (max-width: 760px) { .info { padding: 1rem; } .side-nav, .usage { display: none; } }
+
+/* Accounts: sign-in note, the password form, the account box, and deleting a chat */
+.lock-note { margin: 0; color: var(--muted); font-size: .78rem; }
+.lock button.link { background: none; color: var(--teal-dark); padding: 0; }
+.account { display: flex; flex-wrap: wrap; gap: .2rem .8rem; align-items: center; border-top: 1px solid var(--navy-2); padding-top: .6rem; }
+.account .who { flex: 1 1 100%; color: #fff; font-size: .78rem; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account button { padding: 0; background: none; border: 0; color: var(--navy-text); font-size: .76rem; text-decoration: underline; text-underline-offset: 2px; }
+.account button:hover { color: #fff; }
+.history li { display: flex; align-items: center; gap: .2rem; }
+.history li > button:first-child { flex: 1; min-width: 0; }
+.history .delete { flex: 0 0 auto; width: 1.6rem; padding: .2rem 0; text-align: center; opacity: 0; }
+.history li:hover .delete, .history .delete:focus-visible { opacity: 1; }
+@media (max-width: 760px) { .account .who { display: none; } }

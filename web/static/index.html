@@ -14,11 +14,29 @@
 <body>
   <form id="lock" class="lock" hidden>
     <h1>WFP Chad data assistant</h1>
-    <p>Preliminary estimates. Restricted access.</p>
+    <p>Preliminary estimates. Restricted access: accounts are created by the administrator.</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" required>
     <label for="password">Password</label>
     <input id="password" type="password" autocomplete="current-password" required>
-    <button type="submit">Unlock</button>
+    <button type="submit">Sign in</button>
     <p id="lock-error" class="error" role="alert"></p>
+    <p class="lock-note">No account, or password forgotten? Ask the administrator.</p>
+  </form>
+
+  <form id="change" class="lock" hidden>
+    <h1>Choose your password</h1>
+    <p id="change-why">Your password is temporary: choose your own to continue.</p>
+    <label for="pw-current">Current password</label>
+    <input id="pw-current" type="password" autocomplete="current-password" required>
+    <label for="pw-new">New password</label>
+    <input id="pw-new" type="password" autocomplete="new-password" required>
+    <label for="pw-again">New password again</label>
+    <input id="pw-again" type="password" autocomplete="new-password" required>
+    <p id="pw-rule" class="lock-note"></p>
+    <button type="submit">Save the password</button>
+    <button id="change-cancel" type="button" class="link" hidden>Cancel</button>
+    <p id="change-error" class="error" role="alert"></p>
   </form>
 
   <div id="app" class="app" hidden>
@@ -34,6 +52,11 @@
         <button type="button" data-open="rounds">Rounds and data</button>
       </nav>
       <p id="usage" class="usage"></p>
+      <div class="account">
+        <span id="who" class="who"></span>
+        <button id="change-open" type="button">Change password</button>
+        <button id="sign-out" type="button">Sign out</button>
+      </div>
       <p class="side-foot">Aggregates and metadata only: no household records are sent. Figures are unweighted and preliminary, not official WFP results. AI can make mistakes: check the sources under each answer.</p>
     </aside>
 
@@ -83,7 +106,8 @@
       <li>AI can make mistakes. Check the figures marked as not found, and the sources.</li>
     </ul>
     <h3>Limits and privacy</h3>
-    <p>Each question uses at most <span data-fill="max_tool_rounds">12</span> tool rounds and <span data-fill="seconds_per_question">180</span> seconds, and this computer allows <span data-fill="questions_per_day">100</span> questions a day. Regional aggregates are sent to the Anthropic API to answer; the chat history stays in this browser. Your opinions on the answers stay on this computer.</p>
+    <p>Each question uses at most <span data-fill="max_tool_rounds">12</span> tool rounds and <span data-fill="seconds_per_question">180</span> seconds. Each account may ask <span data-fill="questions_per_day_per_user">50</span> questions a day, and all accounts together <span data-fill="questions_per_day">300</span>. Regional aggregates are sent to the Anthropic API to answer.</p>
+    <p>Your account is personal: the administrator creates it, and sign-ins, failures and password changes are logged. Your chats and your opinions on the answers are kept with your account on the computer that runs the app, visible to you only, and not in your browser. Sign out on a shared computer.</p>
     <p class="muted">The design takes its main ideas from IFPRI's RIAPA-AI: the narrative bound to the numbers the tools compute, checked figures, downloadable traces and blind expert grading (Mukashov et al., 2026, IFPRI Discussion Paper 2424).</p>
   </template>
   <script src="/static/chart.js"></script>

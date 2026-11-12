@@ -36,7 +36,8 @@ python wfp_cli.py rank_regions indicator=fcs_pb round_id=R10
 To chat with it, set an [Anthropic API key](https://console.anthropic.com) as `ANTHROPIC_API_KEY` and run:
 
 ```bash
-WFP_AGENT_ALLOW_UNLOCKED=true python web/app.py     # then open http://127.0.0.1:8011
+python manage_users.py add you@example.org --name "Your Name" --admin   # your account (password typed, not shown)
+python web/app.py                                    # then open http://127.0.0.1:8011 and sign in
 ```
 
 Everything built from the invented dashboard is labelled synthetic, in the tools and in the web app.
@@ -66,9 +67,9 @@ The dashboard's `prepare_app_data.R` is the only step that reads household data.
 | **Charts cannot mislead on season** | The server refuses a line joining the lean-season (PDM) rounds to the post-harvest rounds, a chart with duplicate rows, and non-numeric axes. |
 | **Text from the model cannot run** | The browser inserts it as text; a strict Content-Security-Policy forbids outside scripts, and nothing is loaded from outside the app. |
 | **Each question is bounded** | 12 tool rounds, 180 seconds and 500 rows, and 100 questions a day on one computer, in [`limits.json`](limits.json). |
-| **Access is controlled** | The app listens on this computer only by default, and refuses to start on a reachable host without a password. |
+| **Access is personal** | Every page needs an account created by the administrator ([`manage_users.py`](manage_users.py)); nobody signs up. Passwords are hashed with scrypt and the temporary one must be changed at the first sign-in. Sessions can be ended by the server; 5 failures lock an account for 15 minutes; sign-ins, failures and changes are logged. Each person sees only their own chats. The app listens on this computer only by default. |
 
-**Regional aggregates are sent to the Anthropic API when a question needs them. Agree this use with WFP before sharing the assistant.** Chat history stays in the user's browser and can quote regional values. The opinions on the answers and the count of questions per day stay in `local/` on the computer that runs the app (not versioned).
+**Regional aggregates are sent to the Anthropic API when a question needs them. Agree this use with WFP before sharing the assistant.** Chat history stays in the user's browser and can quote regional values. The accounts, the chats, the opinions on the answers and the counts of questions stay in the app's state folder on the computer that runs it: `%LOCALAPPDATA%\wfp-chad-data-assistant` on Windows (out of OneDrive, which can corrupt a database it syncs), `local/` elsewhere, never in the repository. The browser keeps no chat.
 
 ## Linked with the dashboard
 
@@ -88,7 +89,7 @@ In the web app, the welcome page and the side bar also give:
 
 - **See an example**: a fixed answer the server writes from the tables, with its chart, check and trace. It needs no API key, costs nothing and does not count against the daily limit.
 - **How it works** and **Rounds and data**: how an answer is made and checked, how to read the figures, the data version, the rounds and the tools.
-- **An opinion under each answer** (useful or not, with a comment), kept in `local/feedback.jsonl`. Read it to find weak answers; a question that failed is a good new line for `evals/questions.csv`.
+- **An opinion under each answer** (useful or not, with a comment), kept in `feedback.jsonl` in the state folder, with the account that gave it. Read it to find weak answers; a question that failed is a good new line for `evals/questions.csv`.
 
 ## What it can answer
 
@@ -122,22 +123,22 @@ This needs the merging repository, its dashboard data and WFP's agreement.
    ```bash
    python build_agent_data.py
    ```
-5. **Start**: `run_web.bat`, or `python web/app.py` with `WFP_AGENT_ALLOW_UNLOCKED=true`.
+5. **Accounts**: `run_web.bat` asks for yours the first time (administrator). Add the others with `python manage_users.py add someone@cgiar.org --name "First Last"`, and give them the temporary password by a separate channel; `python manage_users.py list` and `audit` show the accounts and the security log.
+6. **Start**: `run_web.bat`, or `python web/app.py`.
 
-On a server, always set a password and put HTTPS in front of it: `APP_PASSWORD=... HOST=0.0.0.0 python web/app.py`.
+On a server that others reach, put HTTPS in front of it and set `WFP_AGENT_SECURE_COOKIE=true`: `HOST=0.0.0.0 python web/app.py`.
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | none | Needed for the model |
-| `APP_PASSWORD` | none | Password of the web app |
-| `WFP_AGENT_ALLOW_UNLOCKED` | `false` | No password, on this computer only |
+| `WFP_AGENT_SECURE_COOKIE` | `false` | Send the session cookie over HTTPS only; set it behind an HTTPS proxy |
 | `HOST`, `PORT` | `127.0.0.1`, `8011` | Where the web app listens |
 | `WFP_AGENT_MODEL` | `claude-opus-5-5` | Model |
 | `WFP_AGENT_EFFORT` | `high` | `low` to `max`; `medium` costs less and is often enough for look-ups |
 | `WFP_AGENT_DATA` | `data/` | Folder of the tables |
 | `WFP_DASHBOARD_URL` | `https://abson-dev.shinyapps.io/wfp-chad-data-merging/` | The dashboard each result links back to (`#page=...`); empty for no link |
 | `WFP_DASHBOARD_APP` | `../WFP_Chad_Cost_Benefit_Analysis_data_merging/app` | The dashboard folder the build reads |
-| `WFP_AGENT_STATE` | `local/` | Where the web app keeps the feedback and the daily count |
+| `WFP_AGENT_STATE` | `%LOCALAPPDATA%\wfp-chad-data-assistant` on Windows, `local/` elsewhere | Where the web app keeps the accounts, chats, feedback, daily counts and security log. Keep it out of synced folders |
 | `WFP_AGENT_SYSTEM_CERTS` | `true` | Trust the system's certificates (needed behind networks that inspect HTTPS); `false` to use Python's own list only |
 
 The instructions and tool definitions are cached between questions. `ask.py` prints the tokens used; see the [current prices](https://www.anthropic.com/pricing).
@@ -160,7 +161,7 @@ python evals/score_rubric.py SHEET KEY         # scores the graded sheet: shares
 | `tests/test_build.py` | Figures equal to the dashboard's, flags, suppression, the household-column guard | No |
 | `tests/test_tools.py` | Every tool, including its error messages, and the command line | No |
 | `tests/test_publish_and_loop.py` | Chart checks and the agent loop, through the real tools with [scripted replies](tests/scripted_model.py) | Scripted |
-| `tests/test_web.py`, `tests/test_web_pages.py` | Streaming, password, sessions, limits, startup rule; the example, the information pages, the feedback, the daily limit | Scripted |
+| `tests/test_web.py`, `tests/test_web_pages.py` | Accounts, sign-in, locks, sessions, private chats, temporary passwords, the administrator's command line, streaming, limits; the example, the information pages, the feedback | Scripted |
 | `tests/test_browser.py` | The client in real Chrome under the production security policy: every chart type, injected HTML, CSV, history, phone width | Scripted |
 | `tests/test_grounding_and_rubric.py` | The check of the figures, the indicator profile, the trace, the grading statistics | Scripted |
 | `evals/run_evals.py` | 27 questions: the right number (± 0.15), the expected caveats, the right tools, every figure found in the tools | **Live** |
@@ -173,6 +174,7 @@ Only the evals say how good the model's answers are, and only the expert grading
 ```
 ├── build_agent_data.py    dashboard aggregates -> data/ (refuses household-level columns)
 ├── ask.py                 command line: questions to the model
+├── manage_users.py        the administrator's command line: accounts and the security log
 ├── wfp_cli.py             command line: the tools, no API key
 ├── limits.json            limits per question and for the web app
 ├── run_web.bat            starts the web app on this computer
@@ -187,7 +189,7 @@ Only the evals say how good the model's answers are, and only the expert grading
 ├── skill/                 the same tools as a skill for any assistant
 ├── demo/                  the invented dashboard behind the demo and the tests
 ├── tests/, evals/         offline tests; live evals
-├── local/                 feedback and the daily count of the web app, not versioned
+├── local/                 the web app's state where LOCALAPPDATA is not set, not versioned
 └── data/, demo_data/      generated, not versioned
 ```
 

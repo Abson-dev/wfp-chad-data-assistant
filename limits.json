@@ -9,8 +9,13 @@
   "max_history_turns": 12,
   "max_history_chars": 8000,
   "concurrent_questions": 1,
-  "unlock_attempts_per_minute": 5,
   "session_hours": 12,
-  "questions_per_day": 100,
-  "feedback_comment_chars": 1000
+  "questions_per_day": 300,
+  "feedback_comment_chars": 1000,
+  "questions_per_day_per_user": 50,
+  "login_attempts_per_minute": 10,
+  "login_failures_before_lock": 5,
+  "lock_minutes": 15,
+  "password_min_chars": 10,
+  "max_chats_per_user": 200
 }

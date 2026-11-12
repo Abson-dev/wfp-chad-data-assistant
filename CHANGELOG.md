@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 (2026-11-11)
+
+Individual accounts, for security.
+
+- **Added:** accounts created by the administrator with `manage_users.py` (add, list, reset-password, disable, enable, remove, audit); nobody signs up. A new account has a temporary password, typed by the administrator and never shown, to change at the first sign-in.
+- **Added:** passwords hashed with scrypt; sessions as random tokens kept hashed on the server, ended by signing out, a new password, a reset or a disabled account; an account locked for 15 minutes after 5 failures; sign-in attempts limited per address; one refusal message for every failure.
+- **Added:** a security log of sign-ins, failures, locks, password changes and account changes (`manage_users.py audit`).
+- **Changed:** the chats are kept per account on the server (`accounts.sqlite` in the state folder: `%LOCALAPPDATA%\wfp-chad-data-assistant` on Windows, out of OneDrive), visible to their owner only, on any computer; the browser keeps none, and the chats saved by earlier versions are cleared from it. The model's history comes from the server's copy of the chat, not from the browser. A chat can be deleted.
+- **Changed:** the daily limit counts per account (50) and for all accounts (300). The feedback records the account and takes the question and answer from the server's copy.
+- **Removed:** the shared password (`APP_PASSWORD`) and the unlocked mode (`WFP_AGENT_ALLOW_UNLOCKED`). `run_web.bat` asks for the first account when there is none.
+
 ## 0.5.0 (2026-11-11)
 
 Ideas from the riapa.ai web app.

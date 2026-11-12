@@ -1,15 +1,13 @@
 """The design taken from IFPRI's RIAPA-AI: the automatic check of the answer's figures, the indicator profile that
 does the arithmetic, the trace of each answer, and the expert grading against the model alone."""
-import json
 import math
 
-import app as webapp
 import pandas as pd
 import pytest
 import run_evals
 import score_rubric
-from fastapi.testclient import TestClient
 from scripted_model import ScriptedClient
+from webutil import scripted, signed_in, sse
 
 from wfp_agent import grounding, tools
 from wfp_agent.agent import WfpAgent
@@ -67,10 +65,9 @@ def test_a_follow_up_may_repeat_a_figure_of_the_earlier_answer():
     assert agent.ask("Tu confirmes ?").grounding["ok"] and first.grounding["checked"] == 1
 
 
-def test_the_web_answer_carries_the_check_and_the_trace():
-    c = TestClient(webapp.create_app("", lambda: WfpAgent(client=ScriptedClient([[("get_merge_status", {})]], "Done."))))
-    events = [json.loads(x[6:]) for x in c.post("/api/chat/stream", json={"question": "merge?"}).text.splitlines() if x.startswith("data: ")]
-    last = events[-1]
+def test_the_web_answer_carries_the_check_and_the_trace(tmp_path):
+    c = signed_in(tmp_path, scripted([[("get_merge_status", {})]]))
+    last = sse(c.post("/api/chat/stream", json={"question": "merge?"}))[-1]
     assert last["grounding"]["ok"] and last["provenance"]["agent_version"] and last["tool_outputs"]
 
 

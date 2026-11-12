@@ -1,24 +1,24 @@
-"""Web app of the WFP Chad data assistant: a browser chat over the agent's read-only tools.
+"""Web app of the WFP Chad data assistant: a browser chat over the agent's read-only tools, with individual accounts.
 
 From the repository root, in the ensa-agent (or wfp-agent) environment:
+  python manage_users.py add you@example.org --name "Your Name" --admin     # the first account
   python web/app.py
 
-It needs ANTHROPIC_API_KEY to answer, and APP_PASSWORD unless WFP_AGENT_ALLOW_UNLOCKED=true on this computer.
-It listens on 127.0.0.1 only unless HOST says otherwise, and then always requires the password.
+Every page but the sign-in needs an account, created by the administrator (manage_users.py). The chats, the daily
+counts and the security log are kept per account in local/accounts.sqlite (see web/accounts.py). It needs
+ANTHROPIC_API_KEY to answer. It listens on 127.0.0.1 unless HOST says otherwise; put HTTPS in front of a server that
+others reach.
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import os
 import queue
-import secrets
 import sys
 import threading
 import time
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -29,80 +29,51 @@ from pydantic import BaseModel
 
 AGENT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(AGENT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from accounts import AccountError, Accounts, default_state  # noqa: E402
+
 from wfp_agent import tools  # noqa: E402
 
 STATIC = Path(__file__).with_name("static")
-# The feedback and the count of questions per day stay on this computer (not versioned): answers quote regional figures.
-STATE = Path(os.environ.get("WFP_AGENT_STATE", AGENT / "local"))
+# Accounts, chats, daily counts, feedback and the security log stay on this computer, never in the repository
+# (see accounts.default_state: out of OneDrive on Windows).
+STATE = default_state()
 COOKIE = "wfp_agent_session"
-LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 CSP = "; ".join(["default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'", "img-src 'self' data:",
-                 "font-src 'self'", "connect-src 'self'", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'"])
+                 "font-src 'self'", "connect-src 'self'", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'",
+                 "form-action 'self'"])
 
 
 class Chat(BaseModel):
     question: str
-    history: list[dict] = []
+    chat_id: str | None = None
 
 
-class Unlock(BaseModel):
+class Login(BaseModel):
+    email: str
     password: str
 
 
+class NewPassword(BaseModel):
+    current: str
+    new: str
+
+
 class Feedback(BaseModel):
-    question: str
-    answer: str = ""
+    chat_id: str
+    turn: int
     rating: Literal["up", "down"]
     comment: str = ""
-    tool_calls: list[dict] = []
-    grounding: dict = {}
-    provenance: dict = {}
-    example: bool = False
 
 
-class DailyCount:
-    """Questions sent to the model today, kept in a file so a restart does not reset the limit."""
-
-    def __init__(self, path: Path, per_day: int):
-        self.path, self.per_day, self.lock = path, per_day, threading.Lock()
-
-    def _read(self) -> int:
-        try:
-            saved = json.loads(self.path.read_text(encoding="utf-8"))
-            return int(saved["count"]) if saved.get("date") == date.today().isoformat() else 0
-        except (OSError, ValueError, KeyError, TypeError):
-            return 0
-
-    def used(self) -> int:
-        with self.lock:
-            return self._read()
-
-    def take(self) -> bool:
-        """Count one question, or refuse when today's limit is reached."""
-        with self.lock:
-            n = self._read()
-            if n >= self.per_day:
-                return False
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps({"date": date.today().isoformat(), "count": n + 1}), encoding="utf-8")
-            return True
+def open_accounts(state: Path | None = None) -> Accounts:
+    return Accounts((state or STATE) / "accounts.sqlite", tools.LIMITS)
 
 
-def check_startup(host: str, password: str, allow_unlocked: bool) -> None:
-    """A reachable server never runs without a password."""
-    if not password and not (allow_unlocked and host in LOOPBACK):
-        raise SystemExit("Set APP_PASSWORD (or, on your own computer only, WFP_AGENT_ALLOW_UNLOCKED=true).")
-
-
-def clean_history(history: list[dict]) -> list[dict]:
-    """Keep plain question and answer turns from the browser, within the limits."""
-    lim = tools.LIMITS
-    turns = [{"role": t["role"], "content": t["content"][:lim["max_history_chars"]]} for t in history
-             if t.get("role") in ("user", "assistant") and isinstance(t.get("content"), str) and t["content"]]
-    turns = turns[-lim["max_history_turns"] * 2:]
-    while turns and turns[0]["role"] != "user":
-        turns.pop(0)
-    return turns
+def check_startup(accounts: Accounts) -> None:
+    """The app never runs without an account to sign in with."""
+    if accounts.count_active() == 0:
+        raise SystemExit('No account yet. Create the first one: python manage_users.py add you@example.org --name "Your Name" --admin')
 
 
 def first_sentence(doc: str) -> str:
@@ -117,25 +88,26 @@ def default_agent_factory():
     return WfpAgent()
 
 
-def create_app(password: str = "", agent_factory: Callable = default_agent_factory, state: Path | None = None) -> FastAPI:
+def create_app(accounts: Accounts | None = None, agent_factory: Callable = default_agent_factory, state: Path | None = None) -> FastAPI:
     app = FastAPI(title="WFP Chad data assistant", docs_url=None, redoc_url=None, openapi_url=None)
     state = state or STATE
-    count = DailyCount(state / "usage.json", tools.LIMITS["questions_per_day"])
+    accounts = accounts or open_accounts(state)
     feedback_lock = threading.Lock()
-    secret = secrets.token_bytes(32)
     busy = threading.Semaphore(tools.LIMITS["concurrent_questions"])
     attempts: dict[str, list[float]] = {}
+    secure_cookie = os.environ.get("WFP_AGENT_SECURE_COOKIE", "").lower() == "true"
 
-    def token(expires: int) -> str:
-        sig = hmac.new(secret, str(expires).encode(), hashlib.sha256).hexdigest()
-        return f"{expires}.{sig}"
+    def ip_of(request: Request) -> str:
+        return request.client.host if request.client else "?"
 
-    def unlocked(request: Request) -> bool:
-        if not password:
-            return True
-        raw = request.cookies.get(COOKIE, "")
-        expires = raw.split(".")[0]
-        return expires.isdigit() and int(expires) > time.time() and hmac.compare_digest(raw, token(int(expires)))
+    def user_of(request: Request, allow_must_change: bool = False) -> dict:
+        """The signed-in person, or 401; 403 while a temporary password is not yet changed."""
+        u = accounts.session_user(request.cookies.get(COOKIE, ""))
+        if u is None:
+            raise HTTPException(401, "Sign in first.")
+        if u["must_change"] and not allow_must_change:
+            raise HTTPException(403, "Change your temporary password first.")
+        return u
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -143,6 +115,8 @@ def create_app(password: str = "", agent_factory: Callable = default_agent_facto
         response.headers["Content-Security-Policy"] = CSP
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.get("/")
@@ -153,41 +127,63 @@ def create_app(password: str = "", agent_factory: Callable = default_agent_facto
     def health():
         return {"ok": True}
 
-    @app.post("/api/unlock")
-    def unlock(body: Unlock, request: Request):
-        ip = request.client.host if request.client else "?"
-        now = time.time()
+    # ---- Sign-in -------------------------------------------------------------------------------------------
+
+    @app.post("/api/login")
+    def login(body: Login, request: Request):
+        ip, now = ip_of(request), time.time()
         for known in [k for k, v in attempts.items() if not v or now - v[-1] >= 60]:
             del attempts[known]
         recent = [t for t in attempts.get(ip, []) if now - t < 60]
-        if len(recent) >= tools.LIMITS["unlock_attempts_per_minute"]:
+        if len(recent) >= tools.LIMITS["login_attempts_per_minute"]:
             raise HTTPException(429, "Too many attempts: wait a minute.")
         attempts[ip] = recent + [now]
-        if not password or not hmac.compare_digest(body.password.encode(), password.encode()):
-            raise HTTPException(401, "Wrong password.")
+        try:
+            token, user = accounts.login(body.email, body.password, ip)
+        except AccountError as e:
+            raise HTTPException(401, str(e)) from None
         hours = tools.LIMITS["session_hours"]
-        response = JSONResponse({"ok": True})
-        response.set_cookie(COOKIE, token(int(now) + hours * 3600), max_age=hours * 3600, httponly=True, samesite="strict",
-                            secure=request.url.scheme == "https")
+        response = JSONResponse({"ok": True, "user": user})
+        response.set_cookie(COOKIE, token, max_age=hours * 3600, httponly=True, samesite="strict",
+                            secure=secure_cookie or request.url.scheme == "https")
         return response
+
+    @app.post("/api/logout")
+    def logout(request: Request):
+        accounts.logout(request.cookies.get(COOKIE, ""))
+        response = JSONResponse({"ok": True})
+        response.delete_cookie(COOKIE)
+        return response
+
+    @app.post("/api/password")
+    def password(body: NewPassword, request: Request):
+        u = user_of(request, allow_must_change=True)
+        try:
+            accounts.change_password(u, request.cookies.get(COOKIE, ""), body.current, body.new)
+        except AccountError as e:
+            raise HTTPException(400, str(e)) from None
+        return {"ok": True}
 
     @app.get("/api/status")
     def status(request: Request):
-        if not unlocked(request):
+        u = accounts.session_user(request.cookies.get(COOKIE, ""))
+        if u is None:
             return {"locked": True}
+        if u["must_change"]:
+            return {"locked": False, "user": u}
         try:
             info = {**tools.build_info(), "rounds": len(tools._table("rounds.csv"))}
         except FileNotFoundError:
             info = None
-        return {"locked": False, "password_set": bool(password), "has_api_key": bool(os.environ.get("ANTHROPIC_API_KEY")),
-                "data": info, "tools": [t.name for t in tools.TOOLS], "limits": tools.LIMITS,
-                "usage": {"today": count.used(), "per_day": tools.LIMITS["questions_per_day"]}}
+        return {"locked": False, "user": u, "has_api_key": bool(os.environ.get("ANTHROPIC_API_KEY")),
+                "data": info, "tools": [t.name for t in tools.TOOLS], "limits": tools.LIMITS, "usage": accounts.usage(u)}
+
+    # ---- Pages and the fixed example ------------------------------------------------------------------------
 
     @app.get("/api/about")
     def about(request: Request):
         """What the "How it works" and "Rounds and data" pages show: the data version, the rounds and the tools."""
-        if not unlocked(request):
-            raise HTTPException(401, "Locked.")
+        user_of(request)
         try:
             rounds = tools._table("rounds.csv")
             cols = [c for c in ("round_id", "round", "survey", "series", "final_rows", "regions", "date_p01", "date_p99") if c in rounds]
@@ -197,30 +193,54 @@ def create_app(password: str = "", agent_factory: Callable = default_agent_facto
         described = [{"name": t.name, "does": first_sentence(t.description or "")} for t in tools.TOOLS]
         return {"data": info, "rounds": rows, "tools": described, "limits": tools.LIMITS}
 
-    @app.get("/api/example")
+    @app.post("/api/example")
     def example(request: Request):
-        """A fixed answer written by the server from the tables: no model, no API key, no cost."""
-        if not unlocked(request):
-            raise HTTPException(401, "Locked.")
+        """A fixed answer written by the server from the tables (no model, no API key, no cost), kept as a new chat."""
+        u = user_of(request)
         if not busy.acquire(blocking=False):
             raise HTTPException(429, "Another question is running. Try again in a moment.")
         try:
             from wfp_agent import example as fixed
-            return JSONResponse(json.loads(json.dumps(fixed.build(), ensure_ascii=False, default=str)))
+            turn = json.loads(json.dumps(fixed.build(), ensure_ascii=False, default=str))
         except FileNotFoundError:
             raise HTTPException(503, "The agent's tables are not built: run python build_agent_data.py.") from None
         finally:
             busy.release()
+        turn["at"] = datetime.now(UTC).isoformat(timespec="seconds")
+        return {"chat_id": accounts.add_turn(u, None, turn), "turn": turn}
+
+    # ---- Chats -----------------------------------------------------------------------------------------------
+
+    @app.get("/api/chats")
+    def chats(request: Request):
+        return accounts.chats(user_of(request))
+
+    @app.get("/api/chats/{chat_id}")
+    def chat_get(chat_id: str, request: Request):
+        c = accounts.chat(user_of(request), chat_id)
+        if c is None:
+            raise HTTPException(404, "No such chat.")
+        return {"id": c["id"], "title": c["title"], "turns": c["turns"]}
+
+    @app.delete("/api/chats/{chat_id}")
+    def chat_delete(chat_id: str, request: Request):
+        if not accounts.delete_chat(user_of(request), chat_id):
+            raise HTTPException(404, "No such chat.")
+        return {"ok": True}
 
     @app.post("/api/feedback")
     def feedback(body: Feedback, request: Request):
-        """An opinion on one answer, kept on this computer to find weak answers and new eval questions."""
-        if not unlocked(request):
-            raise HTTPException(401, "Locked.")
+        """An opinion on one answer of the person's own chat, kept on this computer to find weak answers."""
+        u = user_of(request)
         if len(body.comment) > tools.LIMITS["feedback_comment_chars"]:
             raise HTTPException(400, f"Keep the comment under {tools.LIMITS['feedback_comment_chars']} characters.")
-        row = {"at": datetime.now(UTC).isoformat(timespec="seconds"), **body.model_dump()}
-        row["question"], row["answer"] = row["question"][:tools.LIMITS["max_question_chars"]], row["answer"][:20000]
+        try:
+            turn = accounts.set_feedback(u, body.chat_id, body.turn, body.rating)
+        except AccountError as e:
+            raise HTTPException(404, str(e)) from None
+        row = {"at": datetime.now(UTC).isoformat(timespec="seconds"), "user": u["email"], "rating": body.rating, "comment": body.comment,
+               "question": turn.get("question"), "answer": turn.get("text"), "example": bool(turn.get("example")),
+               "tool_calls": turn.get("tool_calls"), "grounding": turn.get("grounding"), "provenance": turn.get("provenance")}
         with feedback_lock:
             state.mkdir(parents=True, exist_ok=True)
             with open(state / "feedback.jsonl", "a", encoding="utf-8") as f:
@@ -229,29 +249,36 @@ def create_app(password: str = "", agent_factory: Callable = default_agent_facto
 
     @app.post("/api/chat/stream")
     def chat(body: Chat, request: Request):
-        if not unlocked(request):
-            raise HTTPException(401, "Locked.")
+        u = user_of(request)
         question = body.question.strip()
         if not question or len(question) > tools.LIMITS["max_question_chars"]:
             raise HTTPException(400, f"Ask a question of 1 to {tools.LIMITS['max_question_chars']} characters.")
+        if body.chat_id and accounts.chat(u, body.chat_id) is None:
+            raise HTTPException(404, "No such chat.")
         if not busy.acquire(blocking=False):
             raise HTTPException(429, "Another question is running. Try again in a moment.")
-        if not count.take():
+        if refusal := accounts.take_question(u):
             busy.release()
-            raise HTTPException(429, f"Today's limit of {tools.LIMITS['questions_per_day']} questions is reached. It resets tomorrow; "
-                                     "the fixed example still works.")
+            raise HTTPException(429, refusal + " The fixed example still works.")
         events: queue.Queue = queue.Queue()
 
         def work():
+            turn = {"question": question, "at": datetime.now(UTC).isoformat(timespec="seconds")}
             try:
                 agent = agent_factory()
-                agent.history = clean_history(body.history)
+                # The history comes from the server's copy of the chat, not from the browser.
+                agent.history = accounts.history(u, body.chat_id)
                 a = agent.ask(question, on_event=events.put)
-                events.put({"type": "answer", "text": a.text, "published": a.published, "tool_calls": a.tool_calls,
-                            "input_tokens": a.input_tokens, "output_tokens": a.output_tokens, "refused": a.refused,
-                            "grounding": a.grounding, "provenance": a.provenance, "tool_outputs": a.tool_outputs})
+                turn.update(text=a.text, published=a.published, tool_calls=a.tool_calls, input_tokens=a.input_tokens,
+                            output_tokens=a.output_tokens, refused=a.refused, grounding=a.grounding, provenance=a.provenance,
+                            tool_outputs=a.tool_outputs)
+                turn = json.loads(json.dumps(turn, ensure_ascii=False, default=str))
+                chat_id = accounts.add_turn(u, body.chat_id, turn)
+                events.put({"type": "answer", "chat_id": chat_id, **turn})
             except Exception as e:  # shown to the user, without internals
-                events.put({"type": "error", "message": friendly_error(e)})
+                turn["error"] = friendly_error(e)
+                chat_id = accounts.add_turn(u, body.chat_id, turn)
+                events.put({"type": "error", "chat_id": chat_id, "message": turn["error"]})
             finally:
                 busy.release()
                 events.put(None)
@@ -284,7 +311,6 @@ def friendly_error(e: Exception) -> str:
 if __name__ == "__main__":
     import uvicorn
 
-    host = os.environ.get("HOST", "127.0.0.1")
-    pw = os.environ.get("APP_PASSWORD", "")
-    check_startup(host, pw, os.environ.get("WFP_AGENT_ALLOW_UNLOCKED", "").lower() == "true")
-    uvicorn.run(create_app(pw), host=host, port=int(os.environ.get("PORT", "8011")))
+    store = open_accounts()
+    check_startup(store)
+    uvicorn.run(create_app(store), host=os.environ.get("HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "8011")))
