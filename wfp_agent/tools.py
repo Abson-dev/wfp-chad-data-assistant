@@ -570,6 +570,7 @@ def compare_original(variable: str = "", round_id: str = "") -> str:
         out = out[out["round_id"].isin(rid)]
     cols = ["round_id", "round", "raw_column", "raw_answered", "merged_answered", "raw_mean", "merged_mean", "raw_median",
             "merged_median", "raw_min", "merged_min", "raw_max", "merged_max", "pct_same", "status"]
+    cols += [c for c in ("note",) if c in out.columns]  # why a variable is left out, or its name in the merged file
     head = (f"# {name} ({rows['family'].iloc[0]}): the raw file's values for the households of the merged file against the "
             "merged values. Raw codes are as they are in the raw file.\n")
     return _result(out[cols], call, f"{name}: original against merged", head)

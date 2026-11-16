@@ -49,3 +49,12 @@ def test_original_against_merged_on_the_real_tables(rows):
     codes, _ = rows(tools.compare_original, variable="HHHSex", round_id="R01")
     recode = codes[codes["raw_code"] == 1].iloc[0]
     assert recode["merged_code"] == 2 and not recode["same_code"]
+
+
+def test_the_dropped_workbook_variables_are_back_in_v10(rows):
+    v = pd.read_csv(tools.DATA / "variables.csv")
+    assert len(v) == 768 and {"RESPAge", "RESPSex", "RESPConsent", "SCIEvolRessSociales", "DebutAssistance"} <= set(v["variable"])
+    ov = pd.read_csv(tools.DATA / "original_vs_merged.csv")
+    assert not (ov["status"] == "Not in the merged file").any()
+    t, _ = rows(tools.compare_original, variable="MigrationEmploi")
+    assert (t["status"] == "Merged under another name").all()
