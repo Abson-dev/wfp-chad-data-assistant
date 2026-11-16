@@ -207,7 +207,9 @@ def test_history_survives_a_reload(page):
     assert page.locator(".history li").count() == 1
     page.reload()
     page.wait_for_selector(".history li")
-    page.locator(".history button").first.click()
+    page.locator(".history li button").first.click()
+    # The chat comes from the server: wait for it before counting.
+    page.locator(".turn").first.wait_for()
     assert page.locator(".turn").count() == 1
 
 
