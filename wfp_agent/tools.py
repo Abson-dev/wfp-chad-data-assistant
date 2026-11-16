@@ -525,7 +525,8 @@ def compare_original(variable: str = "", round_id: str = "") -> str:
     - No variable: FCS and rCSI recomputed from the raw items against the merged scores, by round, with the reason for
       any difference; and how many variables are identical, keep their values with other answers, or differ, by round.
     - A variable: for each round, the raw column, answers, mean, median, min and max on both sides, the share of
-      households with the same value, and a status.
+      households with the same value, and a status; and any labelled raw answers set to missing in the merged file,
+      with the documented rule.
     - A variable and one round: how each raw code became a merged code (households per pair; blank under 5).
     A status "Values differ" is mostly a recode on purpose (codes put on one scale); search_data_issues says when it is
     a defect. Means of coded variables compare codes, not quantities.
@@ -573,6 +574,15 @@ def compare_original(variable: str = "", round_id: str = "") -> str:
     cols += [c for c in ("note",) if c in out.columns]  # why a variable is left out, or its name in the merged file
     head = (f"# {name} ({rows['family'].iloc[0]}): the raw file's values for the households of the merged file against the "
             "merged values. Raw codes are as they are in the raw file.\n")
+    lost = _table("original_vs_merged_missing.csv")
+    lost = lost[lost["variable"] == name]
+    if rid:
+        lost = lost[lost["round_id"].isin(rid)]
+    if len(lost):
+        head += ("# Labelled raw answers missing in the merged file (households blank under 5), and why: "
+                 + "; ".join(f"{r.round_id} {r.raw_label}"
+                             + (f" ({int(r.households)})" if pd.notna(r.households) else "") + f": {r.reason}"
+                             for r in lost.itertuples()) + "\n")
     return _result(out[cols], call, f"{name}: original against merged", head)
 
 

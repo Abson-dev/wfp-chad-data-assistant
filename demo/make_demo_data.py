@@ -280,6 +280,9 @@ def write_app(app: Path) -> None:
                       "households": k if k >= 5 else None, "raw_code_total": k if k >= 5 else None, "merged_code_total": k if k >= 5 else None,
                       "pct_of_raw_code": 100.0 if k >= 5 else None, "same_code": True, "suppressed": k < 5})
     w(pd.DataFrame(codes), "original_vs_merged_categories.csv")
+    lost = [{"round_id": rid, "variable": var, "raw_code": 99.0, "raw_label": "Autre (illustration)", "households": 7,
+             "reason": "Illustration: rule hidden in the synthetic version."} for var, _, rid, _, _, _ in agree[:3]]
+    w(pd.DataFrame(lost, columns=["round_id", "variable", "raw_code", "raw_label", "reason", "households"]), "original_vs_merged_lost.csv")
     scores = []
     for rid in RIDS:
         n = int(per_round[rid])

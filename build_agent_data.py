@@ -46,6 +46,7 @@ COPY = {
     "original_vs_merged_variables.csv": "original_vs_merged.csv",
     "original_vs_merged_categories.csv": "original_vs_merged_codes.csv",
     "original_vs_merged_indicators.csv": "original_vs_merged_scores.csv",
+    "original_vs_merged_lost.csv": "original_vs_merged_missing.csv",
     "assistance_by_round.csv": "assistance_by_round.csv",
     "assistance_by_region.csv": "assistance_by_region.csv",
     "cost_reconciliation.csv": "cost_reconciliation.csv",

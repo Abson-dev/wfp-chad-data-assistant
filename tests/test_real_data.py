@@ -53,8 +53,17 @@ def test_original_against_merged_on_the_real_tables(rows):
 
 def test_the_dropped_workbook_variables_are_back_in_v10(rows):
     v = pd.read_csv(tools.DATA / "variables.csv")
-    assert len(v) == 768 and {"RESPAge", "RESPSex", "RESPConsent", "SCIEvolRessSociales", "DebutAssistance"} <= set(v["variable"])
+    assert len(v) == 769 and {"RESPAge", "RESPSex", "RESPConsent", "SCIEvolRessSociales", "DebutAssistance"} <= set(v["variable"])
     ov = pd.read_csv(tools.DATA / "original_vs_merged.csv")
     assert not (ov["status"] == "Not in the merged file").any()
     t, _ = rows(tools.compare_original, variable="MigrationEmploi")
     assert (t["status"] == "Merged under another name").all()
+
+
+def test_v11_restores_education_and_documents_every_missing_answer(rows):
+    lost = pd.read_csv(tools.DATA / "original_vs_merged_missing.csv")
+    assert len(lost) and not lost["reason"].str.startswith("Not documented").any()
+    assert not lost["variable"].isin(["HHHEdu", "HHSourceIncome"]).any()
+    assert "HHHMainActivityGroup" in set(pd.read_csv(tools.DATA / "variables.csv")["variable"])
+    t, text = rows(tools.compare_original, variable="HHHMainActivity")
+    assert "HHHMainActivityGroup" in text

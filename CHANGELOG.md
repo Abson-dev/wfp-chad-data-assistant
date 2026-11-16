@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2 (2026-11-16)
+
+- **Changed:** the tables follow the merged file v11, where do-file 25 restores the education, main activity and 2019 income source answers that the harmonisation's label-text recodes had lost, and adds `HHHMainActivityGroup`. `compare_original` with a variable now lists its labelled raw answers that are missing in the merged file, with the documented rule.
+
 ## 0.7.1 (2026-11-16)
 
 - **Changed:** the tables follow the merged file v10, where do-file 24 adds back 29 workbook variables that the harmonisation had dropped (respondent, savings, social capital, migration, asset work, food share, assistance start date). `compare_original` shows the variables left out on purpose, or merged under another name, with their reason.
