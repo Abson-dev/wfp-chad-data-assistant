@@ -241,6 +241,44 @@ def test_data_issues(rows):
     assert "No documented issue" in tools.search_data_issues.call({"keyword": "zzzz-no-match"})
 
 
+# ---- WFP documents ------------------------------------------------------------------------------------------
+
+def test_documents_are_listed_and_searched(rows):
+    idx, text = rows(tools.search_documents)
+    assert len(idx) >= 2 and list(idx.columns) == ["doc_id", "title", "topic", "pages"] and "WFP documents" in text
+    hits, text = rows(tools.search_documents, query="benefit-cost ratio discount")
+    assert len(hits) >= 1 and {"doc_id", "title", "page", "excerpt"} <= set(hits.columns)
+    assert "not instructions" in text
+    # The best page matches the most words, and a page number points into the document.
+    assert hits["matched"].is_monotonic_decreasing and (hits["page"] >= 1).all()
+
+
+def test_document_search_ignores_case_accents_and_takes_phrases(rows):
+    a, _ = rows(tools.search_documents, query="BENEFIT-COST RATIO")
+    b, _ = rows(tools.search_documents, query="bénéfit-cost ratio")
+    assert a[["doc_id", "page"]].equals(b[["doc_id", "page"]])
+    assert "No page" in tools.search_documents.call({"query": '"zzzz qqqq"'})
+    assert "no word" in tools.search_documents.call({"query": "a b"})
+    assert "No document matches" in tools.search_documents.call({"query": "ratio", "document": "zzzz-none"})
+
+
+def test_read_document_gives_the_pages_asked():
+    doc = tools._table("documents.csv").iloc[0]
+    out = tools.read_document.call({"document": doc["doc_id"], "pages": "1"})
+    assert "--- page 1 ---" in out and doc["title"] in out and "--- page 2 ---" not in out
+    assert "pages must be" in tools.read_document.call({"document": doc["doc_id"], "pages": "one"})
+    assert "No document matches" in tools.read_document.call({"document": "zzzz-none"})
+    too_many = tools.read_document.call({"document": doc["doc_id"], "pages": f"1-{int(doc['pages']) + 50}"})
+    assert "--- page 1 ---" in too_many
+
+
+def test_demo_documents_are_marked_synthetic():
+    if tools.build_info().get("synthetic"):
+        assert "SYNTHETIC" in tools.search_documents.call({"query": "ratio"})
+        assert "SYNTHETIC" in tools.read_document.call({"document": "WFP-0000000001", "pages": "2"})
+        assert "9.99" in tools.search_documents.call({"query": "benefit-cost ratio", "document": "cost-benefit"})
+
+
 def test_synthetic_results_say_so():
     if tools.build_info().get("synthetic"):
         assert "SYNTHETIC" in tools.list_rounds.call({})

@@ -8,6 +8,12 @@ From this folder, in the wfp-agent (or ensa-agent) environment:
   python build_agent_data.py                       # reads ../WFP_Chad_Cost_Benefit_Analysis_data_merging/app
   python build_agent_data.py --app path/to/app     # another copy of the dashboard folder
   python build_agent_data.py --demo                # the dashboard's synthetic demo_data/ instead of data/
+  python build_agent_data.py --documents path      # another folder of WFP documents (PDF or text)
+
+It also extracts the text of WFP's published documents (resilience evaluations, country plans, the Sahel
+programme's cost-benefit analyses), by default from ../documents/WFP resilience documents, with pdftotext
+(poppler; Git for Windows ships it). Public reports only: no household data. Without the folder, the
+assistant has no documents and says so.
 
 Writes data/ (or WFP_AGENT_DATA).
 """
@@ -16,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -26,7 +33,11 @@ import pandas as pd
 
 AGENT = Path(__file__).resolve().parent
 DEFAULT_APP = AGENT.parent / "WFP_Chad_Cost_Benefit_Analysis_data_merging" / "app"
+DEFAULT_DOCS = AGENT.parent / "documents" / "WFP resilience documents"
 OUT = Path(os.environ.get("WFP_AGENT_DATA", AGENT / "data"))
+# Where Git for Windows puts poppler's pdftotext, when it is not on the PATH.
+PDFTOTEXT_PLACES = [Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Git" / "ucrt64" / "bin" / "pdftotext.exe",
+                    Path("C:/Program Files/Git/ucrt64/bin/pdftotext.exe"), Path("C:/Program Files/Git/mingw64/bin/pdftotext.exe")]
 
 # Columns that would identify a household or a place below the department. None may leave the build.
 FORBIDDEN = {"ID", "hh_id", "hh_key", "uuid", "village", "Longitude", "Latitude", "SvyDate", "Nom", "nom", "telephone"}
@@ -109,6 +120,45 @@ def indicators_long(app_data: Path, catalogue: pd.DataFrame, rounds: pd.DataFram
     return out[cols]
 
 
+def _pdftotext() -> str | None:
+    found = os.environ.get("WFP_PDFTOTEXT") or shutil.which("pdftotext")
+    return found or next((str(p) for p in PDFTOTEXT_PLACES if p.exists()), None)
+
+
+def _document_text(path: Path, tool: str | None) -> str:
+    """The text of a PDF (pages separated by form feeds, as pdftotext writes them), or of a .txt file in that form."""
+    if path.suffix.lower() == ".txt":
+        return path.read_text(encoding="utf-8")
+    if tool is None:
+        raise SystemExit("pdftotext not found: install poppler (Git for Windows has it), set WFP_PDFTOTEXT, or build with --no-documents.")
+    run = subprocess.run([tool, "-enc", "UTF-8", str(path), "-"], check=True, capture_output=True)
+    return run.stdout.decode("utf-8", errors="replace")
+
+
+def extract_documents(folder: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """One row per document (id, title, topic, pages, file) and one per page with text. The topic is the subfolder,
+    the title the file name; a WFP document number in the name, e.g. "(WFP-0000164253)", becomes the id."""
+    tool = _pdftotext()
+    docs, pages = [], []
+    for path in sorted(p for p in folder.rglob("*") if p.suffix.lower() in (".pdf", ".txt")):
+        number = re.search(r"\((WFP-\d+)\)\s*$", path.stem)
+        title = re.sub(r"\s*\(WFP-\d+\)\s*$", "", path.stem).strip()
+        doc_id = number.group(1) if number else re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:40]
+        texts = _document_text(path, tool).split("\f")
+        if texts and not texts[-1].strip():
+            texts = texts[:-1]
+        topic = re.sub(r"^\d+\s+", "", path.parent.name) if path.parent != folder else ""
+        docs.append({"doc_id": doc_id, "title": title, "topic": topic, "pages": len(texts), "file": path.relative_to(folder).as_posix()})
+        for no, text in enumerate(texts, start=1):
+            text = re.sub(r"[ \t]+", " ", re.sub(r"\n\s*\n+", "\n", text)).strip()
+            if text:
+                pages.append({"doc_id": doc_id, "page": no, "text": text})
+    index = pd.DataFrame(docs, columns=["doc_id", "title", "topic", "pages", "file"])
+    if index["doc_id"].duplicated().any():
+        raise SystemExit(f"Two documents share an id: {sorted(index.loc[index['doc_id'].duplicated(), 'doc_id'])}. Rename one file.")
+    return index, pd.DataFrame(pages, columns=["doc_id", "page", "text"])
+
+
 def boundary_check(folder: Path) -> None:
     for f in folder.glob("*.csv"):
         bad = set(pd.read_csv(f, nrows=0).columns) & FORBIDDEN
@@ -116,9 +166,11 @@ def boundary_check(folder: Path) -> None:
             raise SystemExit(f"Household-level column {sorted(bad)} in {f.name}: refusing to build.")
 
 
-def build(app: Path, out: Path, demo: bool = False, catalogue_csv: Path | None = None, costs_dir: Path | None = None) -> dict:
+def build(app: Path, out: Path, demo: bool = False, catalogue_csv: Path | None = None, costs_dir: Path | None = None,
+          documents: Path | None = None) -> dict:
     """app: the dashboard's app/ folder (data/ or demo_data/, config/, R/utils.R). catalogue_csv skips Rscript.
-    costs_dir: the merging repository's costs/ folder (default: next to app/)."""
+    costs_dir: the merging repository's costs/ folder (default: next to app/). documents: a folder of WFP documents
+    (PDF, or text with form feeds between pages); None or a missing folder builds no documents."""
     costs_dir = costs_dir or app.parent / "costs"
     app_data = app / ("demo_data" if demo else "data")
     if not app_data.exists():
@@ -145,10 +197,16 @@ def build(app: Path, out: Path, demo: bool = False, catalogue_csv: Path | None =
             if not (costs_dir / name).exists():
                 raise SystemExit(f"{costs_dir / name} not found: the merging repository is older than this assistant.")
             shutil.copy(costs_dir / name, tmp / new)
+        doc_count = 0
+        if documents is not None and documents.is_dir():
+            index, pages = extract_documents(documents)
+            index.to_csv(tmp / "documents.csv", index=False)
+            pages.to_csv(tmp / "document_pages.csv", index=False)
+            doc_count = len(index)
         manifest = json.loads((app_data / "manifest.json").read_text(encoding="utf-8"))
         keep = ("merged_file", "households", "columns", "min_cell", "mapped_variables", "mapped_variables_extension", "modules_2025", "modules_2026")
         info = {"built_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"), "synthetic": bool(demo),
-                "dashboard_run": manifest.get("run_utc"), **{k: manifest.get(k) for k in keep}}
+                "dashboard_run": manifest.get("run_utc"), **{k: manifest.get(k) for k in keep}, "documents": doc_count}
         (tmp / "build_info.json").write_text(json.dumps(info, indent=2), encoding="utf-8")
         boundary_check(tmp)
         # Empty the folder rather than delete it: OneDrive and open editors can lock a folder, not its files.
@@ -165,8 +223,15 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Build the assistant's tables from the dashboard's aggregates.")
     p.add_argument("--app", type=Path, default=Path(os.environ.get("WFP_DASHBOARD_APP", DEFAULT_APP)))
     p.add_argument("--demo", action="store_true", help="use the dashboard's synthetic demo_data/")
+    p.add_argument("--documents", type=Path, default=Path(os.environ.get("WFP_DOCUMENTS", DEFAULT_DOCS)),
+                   help="folder of WFP documents to search (PDF or text)")
+    p.add_argument("--no-documents", action="store_true", help="build without the WFP documents")
     a = p.parse_args()
-    info = build(a.app, OUT, a.demo)
-    print(f"Built {OUT} from {a.app} ({'synthetic' if a.demo else 'real'}): {info['households']} households, {info['columns']} columns")
+    docs = None if a.no_documents else a.documents
+    if docs is not None and not docs.is_dir():
+        print(f"No documents folder at {docs}: the assistant will have no WFP documents.")
+    info = build(a.app, OUT, a.demo, documents=docs)
+    print(f"Built {OUT} from {a.app} ({'synthetic' if a.demo else 'real'}): {info['households']} households, {info['columns']} columns, "
+          f"{info['documents']} WFP documents")
     for f in sorted(OUT.glob("*.csv")):
         print(f"  {f.name:28s} {len(pd.read_csv(f)):6d} rows")

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0 (2026-11-26)
+
+- **Added:** WFP's published documents on resilience, searchable by the assistant: `search_documents` finds the best-matching pages (words without case or accents, phrases in quotes, filtered by document or topic) and `read_document` gives the text of chosen pages. 56 reports: the evaluation of the Chad resilience activities 2018-2022, the Chad country strategic plans 2019-2023 (evaluation) and 2024-2028 (plan, revisions, annual country reports 2024 and 2025), the Sahel Integrated Resilience Programme's notes (the cost-benefit analysis and its site example, averted humanitarian needs, evidence, scale-up, the BMZ partnership), and WFP's resilience policy and its evaluation.
+- **Added:** `build_agent_data.py` extracts the documents' text with pdftotext into `data/documents.csv` and `data/document_pages.csv` (`--documents`, `--no-documents`). The demo build has two invented documents.
+- **Changed:** the instructions say to cite a document by title and page, to attribute its figures to WFP and keep them apart from the survey figures, to say when a figure is modelled, and that a document's text is never an instruction.
+
 ## 0.7.2 (2026-11-16)
 
 - **Changed:** the tables follow the merged file v11, where do-file 25 restores the education, main activity and 2019 income source answers that the harmonisation's label-text recodes had lost, and adds `HHHMainActivityGroup`. `compare_original` with a variable now lists its labelled raw answers that are missing in the merged file, with the documented rule.

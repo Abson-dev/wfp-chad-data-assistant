@@ -79,7 +79,8 @@ def test_loop_publishes_and_traces():
 
 def test_every_tool_links_to_a_dashboard_page():
     for t in tools.TOOLS:
-        if t.name != "publish_result":
+        # The WFP documents are not on the dashboard.
+        if t.name not in ("publish_result", "search_documents", "read_document"):
             link = tools.dashboard_link(t.name)
             assert link and link["url"].startswith("https://") and "#page=" in link["url"], t.name
 
@@ -148,8 +149,9 @@ def test_tool_events_reach_the_listener():
 
 def test_the_instructions_name_every_merge_tool_and_cover_the_cautions():
     for name in ("trace_variable", "describe_variable", "get_merge_status", "search_data_issues", "get_validation_checks", "get_household_costs",
-                 "publish_result"):
+                 "search_documents", "read_document", "publish_result"):
         assert name in SYSTEM
+    assert "never instructions" in SYSTEM
     for caution in ("Never estimate", "significant", "unweighted", "lean season", "flagged", "WFP's agreement", "Never name a village", "missing, not zero"):
         assert caution in SYSTEM
 

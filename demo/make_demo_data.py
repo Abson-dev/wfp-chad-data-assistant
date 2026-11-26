@@ -362,6 +362,29 @@ def write_app(app: Path) -> None:
     (d / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
+# Two invented documents in the form pdftotext writes (pages separated by form feeds). Nothing in them is WFP's.
+DEMO_DOCUMENTS = {
+    "01 Demo evaluations/Demo resilience evaluation (WFP-0000000001).txt": [
+        "Demo resilience evaluation\nSYNTHETIC DEMO DOCUMENT: every sentence and figure is invented.",
+        "Asset creation and school meals were combined in convergence villages. The demo evaluation found that "
+        "monitoring indicators lacked baselines in two demo regions.",
+        "Recommendation 1: harmonise the demo monitoring surveys across rounds.",
+    ],
+    "02 Demo cost-benefit/Demo cost-benefit note.txt": [
+        "Demo cost-benefit note\nSYNTHETIC DEMO DOCUMENT.",
+        "The demo benefit-cost ratio is 9.99 after 5 years, with a discount rate of 7.7 percent. Lean season "
+        "assistance costs 11 USD per person per month in this invented example.",
+    ],
+}
+
+
+def write_documents(folder: Path) -> None:
+    for name, pages in DEMO_DOCUMENTS.items():
+        path = folder / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\f".join(pages) + "\f", encoding="utf-8")
+
+
 def build(out: Path, keep_app: Path | None = None) -> dict:
     """Write the invented dashboard folder, then build the assistant's tables from it into `out`."""
     app = keep_app or Path(tempfile.mkdtemp(prefix="wfp_demo_app_"))
@@ -369,7 +392,9 @@ def build(out: Path, keep_app: Path | None = None) -> dict:
         if app.exists() and keep_app:
             shutil.rmtree(app)
         write_app(app)
-        return build_agent_data.build(app, out, demo=True, catalogue_csv=app / "indicator_catalog.csv", costs_dir=app / "costs")
+        write_documents(app / "documents")
+        return build_agent_data.build(app, out, demo=True, catalogue_csv=app / "indicator_catalog.csv", costs_dir=app / "costs",
+                                      documents=app / "documents")
     finally:
         if not keep_app:
             shutil.rmtree(app, ignore_errors=True)

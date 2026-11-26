@@ -106,6 +106,7 @@ In the web app, the welcome page and the side bar also give:
 | | `rank_regions`, `relate_indicators` | Regions against all surveyed households; two indicators across regions, with correlations |
 | **The programme** | `get_assistance`, `get_costs` | The WFP interventions households report; WFP's reconciled resilience costs (XAF) by period, activity, area and partner |
 | **Costs per household** | `get_household_costs` | The 44 cost variables of the merged file as aggregates: by round (and the source of the community cost), by intervention, by asset type, by region; the ledger of the community template; the template against WFP's revised workbook; unit costs, exchange rates and the dictionary of the cost variables |
+| **WFP's documents** | `search_documents`, `read_document` | 56 published WFP reports on resilience (the Chad resilience evaluation 2018-2022, the Chad country plans, their evaluation and the annual country reports, the Sahel programme's cost-benefit analyses and averted-needs estimate, WFP's resilience policy): the best-matching pages with an excerpt, then the text of the pages, cited by title and page |
 | **The reader** | `publish_result` | The checked table and chart under the answer |
 
 **It cannot:** weight the figures, give confidence intervals or significance tests, go below the region, compute a new indicator, or see a household. Correlations describe regions, not households. Child (MAD) and women's (MDD-W) diet data are not in the merged file. It says so rather than guess.
@@ -120,10 +121,11 @@ This needs the merging repository, its dashboard data and WFP's agreement.
    setx ANTHROPIC_API_KEY "sk-ant-..."     # Windows, then open a new terminal
    ```
 3. **Dashboard data.** In the merging repository, run `app/prepare_app_data.R` after each new merged file. Keep that repository next to this folder, or set `WFP_DASHBOARD_APP` to its `app/` folder.
-4. **Tables** (a few seconds; Rscript must be on the PATH to export the indicator catalogue):
+4. **Tables** (under a minute; Rscript must be on the PATH to export the indicator catalogue):
    ```bash
    python build_agent_data.py
    ```
+   The build also extracts the text of WFP's published documents from `../documents/WFP resilience documents` (one subfolder per topic; set `WFP_DOCUMENTS` or `--documents` for another folder, `--no-documents` to skip). It needs poppler's `pdftotext`, which Git for Windows ships; set `WFP_PDFTOTEXT` if it is elsewhere. The PDFs and their text stay in that folder and in `data/`, out of this repository. To add a document, save its PDF in the folder (a name ending in `(WFP-0000123456)` gives its id) and rebuild.
 5. **Accounts**: `run_web.bat` asks for yours the first time (administrator). Add the others with `python manage_users.py add someone@cgiar.org --name "First Last"`, and give them the temporary password by a separate channel; `python manage_users.py list` and `audit` show the accounts and the security log.
 6. **Start**: `run_web.bat`, or `python web/app.py`.
 

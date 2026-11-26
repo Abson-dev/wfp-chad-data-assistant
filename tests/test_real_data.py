@@ -67,3 +67,16 @@ def test_v11_restores_education_and_documents_every_missing_answer(rows):
     assert "HHHMainActivityGroup" in set(pd.read_csv(tools.DATA / "variables.csv")["variable"])
     t, text = rows(tools.compare_original, variable="HHHMainActivity")
     assert "HHHMainActivityGroup" in text
+
+
+def test_the_wfp_documents_are_searchable(rows):
+    idx = pd.read_csv(tools.DATA / "documents.csv")
+    assert len(idx) >= 50 and {"WFP-0000164253", "WFP-0000155096", "WFP-0000165233"} <= set(idx["doc_id"])
+    # Every document has text: a scanned PDF without a text layer would need OCR.
+    pages = pd.read_csv(tools.DATA / "document_pages.csv")
+    assert set(idx["doc_id"]) == set(pages["doc_id"])
+    t, _ = rows(tools.search_documents, query="benefit-cost ratio", document="WFP-0000164253")
+    assert len(t) and (t["doc_id"] == "WFP-0000164253").all()
+    assert "295" in tools.read_document.call({"document": "WFP-0000164253", "pages": ",".join(map(str, t["page"].head(3)))})
+    fr, _ = rows(tools.search_documents, query="convergence FFA", document="Chad resilience evaluation")
+    assert len(fr)
