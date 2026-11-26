@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.1 (2026-11-26)
+
+- **Changed:** the tables follow the merged file v12, where do-file 27 corrects the label of `Montant` (the cash received at the last distribution, not an amount from the main income source); values unchanged.
+
 ## 0.9.0 (2026-11-26)
 
 - **Added:** `get_diet`, the child and women's diet of the 2021 Annual to the 2023 Annual, from the two person-level files that the merging repository's `merge/26_WFP_Chad_link_diet.R` now links to households: minimum dietary diversity, meal frequency and acceptable diet of children 6-23 months, and MDD-W of women 15-49, by round; and the quality of the link (records linked, households whose record count matches).
