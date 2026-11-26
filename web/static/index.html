@@ -88,10 +88,10 @@
   </div>
   <template id="how-it-works">
     <h2>How it works</h2>
-    <p>The assistant answers from the <strong>aggregate tables of the dashboard</strong> of the merging repository, built from <span data-fill="merged_file">the merged file</span>. It never sees a household record.</p>
+    <p>The assistant answers from the <strong>aggregate tables of the dashboard</strong> of the merging repository, built from <span data-fill="merged_file">the merged file</span>, and from the text of <strong>WFP's published documents on resilience</strong> (evaluations, country plans, the Sahel programme's cost-benefit analyses). It never sees a household record.</p>
     <ol class="how-steps">
       <li><strong>You ask</strong>, in English or French.</li>
-      <li><strong>The model chooses tools</strong>: read-only functions over the tables (indicators, regions, merge steps, variables, checks, data issues, costs). They compute the changes, gaps and rankings, so the model does no arithmetic.</li>
+      <li><strong>The model chooses tools</strong>: read-only functions over the tables (indicators, regions, merge steps, variables, checks, data issues, costs) and a search of WFP's documents. They compute the changes, gaps and rankings, so the model does no arithmetic.</li>
       <li><strong>The model writes the answer</strong> from what the tools returned, under instructions that forbid inventing numbers or causes the tables do not measure.</li>
       <li><strong>The server checks every figure</strong> of the answer against the tool results: green when all are found, orange with the list of those not found.</li>
       <li><strong>You see the table and the chart</strong> behind the answer, checked by the server (a line never joins lean-season and post-harvest rounds), its sources, a link to the dashboard page, and a trace you can download.</li>
@@ -103,10 +103,11 @@
       <li>Compare annual with annual and PDM with PDM: the seasons differ.</li>
       <li>Regional cells under 30 households are hidden. Known defects are flagged, with their reason.</li>
       <li>The tables describe; they do not explain. The programme's effect needs the household data, as the cost-benefit analysis will do.</li>
+      <li>A figure from a WFP document is WFP's statement, cited with its title and page, not a result of the survey data. The Sahel cost-benefit analyses are models built on assumptions.</li>
       <li>AI can make mistakes. Check the figures marked as not found, and the sources.</li>
     </ul>
     <h3>Limits and privacy</h3>
-    <p>Each question uses at most <span data-fill="max_tool_rounds">12</span> tool rounds and <span data-fill="seconds_per_question">180</span> seconds. Each account may ask <span data-fill="questions_per_day_per_user">50</span> questions a day, and all accounts together <span data-fill="questions_per_day">300</span>. Regional aggregates are sent to the Anthropic API to answer.</p>
+    <p>Each question uses at most <span data-fill="max_tool_rounds">12</span> tool rounds and <span data-fill="seconds_per_question">180</span> seconds. Each account may ask <span data-fill="questions_per_day_per_user">50</span> questions a day, and all accounts together <span data-fill="questions_per_day">300</span>. Regional aggregates, and passages of WFP's published documents, are sent to the Anthropic API to answer.</p>
     <p>Your account is personal: the administrator creates it, and sign-ins, failures and password changes are logged. Your chats and your opinions on the answers are kept with your account on the computer that runs the app, visible to you only, and not in your browser. Sign out on a shared computer.</p>
     <p class="muted">The design takes its main ideas from IFPRI's RIAPA-AI: the narrative bound to the numbers the tools compute, checked figures, downloadable traces and blind expert grading (Mukashov et al., 2026, IFPRI Discussion Paper 2424).</p>
   </template>
