@@ -69,6 +69,15 @@ def test_v11_restores_education_and_documents_every_missing_answer(rows):
     assert "HHHMainActivityGroup" in text
 
 
+def test_the_diet_records_are_linked_once(rows):
+    k, _ = rows(tools.get_diet, view="link")
+    assert k.groupby("module")["linked_rows"].sum().to_dict() == {"MAD": 2197, "MDDW": 6452}
+    assert (k["pct_count_match"] >= 90).all()
+    # The single-form 2023 Annual links every record.
+    r10 = k[k["round_id"] == "R10"]
+    assert (r10["linked_rows"] == r10["raw_rows"]).all()
+
+
 def test_the_wfp_documents_are_searchable(rows):
     idx = pd.read_csv(tools.DATA / "documents.csv")
     assert len(idx) >= 50 and {"WFP-0000164253", "WFP-0000155096", "WFP-0000165233"} <= set(idx["doc_id"])

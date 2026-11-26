@@ -351,7 +351,15 @@ def write_app(app: Path) -> None:
     w(pd.DataFrame([(f"{r} Centre", r, "Direct", y, "Cost and survey", 1e8, 1e8, 0, 120, 60, 60, 55.0) for r in REGIONS[:4] for y in range(2019, 2024)],
                    columns=["cost_area", "region", "link_type", "year", "status", "cost_xaf", "cost_activity_xaf", "cost_lump_sum_xaf",
                             "households_surveyed", "households_pdm", "households_annual", "pct_cash_for_assets"]), "cost_survey_link.csv")
-    w(pd.DataFrame([("MAD", rid, 300, 450) for rid in RIDS[5:]], columns=["module", "round_id", "raw_rows", "module_rows"]), "nutrition_rows.csv")
+    w(pd.DataFrame([(m, rid, 300, 450, 295, 280, round(float(rng.uniform(88, 99)), 1), 5) for m in ("MAD", "MDDW") for rid in RIDS[5:]],
+                   columns=["module", "round_id", "raw_rows", "module_rows", "linked_rows", "households", "pct_count_match", "unlinked_rows"]),
+      "nutrition_rows.csv")
+    diet = [("MDD", "Children 6-23 months", "Minimum dietary diversity, children 6-23 months"),
+            ("MMF", "Children 6-23 months", "Minimum meal frequency, children 6-23 months"),
+            ("MAD", "Children 6-23 months", "Minimum acceptable diet, children 6-23 months"),
+            ("MDDW", "Women 15-49", "Minimum dietary diversity, women 15-49")]
+    w(pd.DataFrame([(rid, who, ind, lab, int(rng.integers(250, 900)), round(float(rng.uniform(5, 50)), 1)) for rid in RIDS[5:] for ind, who, lab in diet],
+                   columns=["round_id", "who", "indicator", "label", "persons", "value"]), "nutrition_indicators.csv")
     w(pd.DataFrame([(rid, p, int(rng.integers(50, 900)), int(rng.integers(1, 8))) for rid in RIDS for p in (1, 2, 3)],
                    columns=["round_id", "phase", "households", "districts"]), "ch_phase_by_round.csv")
 

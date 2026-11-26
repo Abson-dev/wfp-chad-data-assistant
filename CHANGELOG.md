@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.0 (2026-11-26)
+
+- **Added:** `get_diet`, the child and women's diet of the 2021 Annual to the 2023 Annual, from the two person-level files that the merging repository's `merge/26_WFP_Chad_link_diet.R` now links to households: minimum dietary diversity, meal frequency and acceptable diet of children 6-23 months, and MDD-W of women 15-49, by round; and the quality of the link (records linked, households whose record count matches).
+- **Changed:** the instructions no longer say that the diet data cannot be linked; they say that results from the older Rmd 09 and 10 files are wrong, and that the diet files are not in the release until reviewed.
+
 ## 0.8.0 (2026-11-26)
 
 - **Added:** WFP's published documents on resilience, searchable by the assistant: `search_documents` finds the best-matching pages (words without case or accents, phrases in quotes, filtered by document or topic) and `read_document` gives the text of chosen pages. 56 reports: the evaluation of the Chad resilience activities 2018-2022, the Chad country strategic plans 2019-2023 (evaluation) and 2024-2028 (plan, revisions, annual country reports 2024 and 2025), the Sahel Integrated Resilience Programme's notes (the cost-benefit analysis and its site example, averted humanitarian needs, evidence, scale-up, the BMZ partnership), and WFP's resilience policy and its evaluation.

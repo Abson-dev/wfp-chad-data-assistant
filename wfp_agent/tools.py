@@ -38,6 +38,7 @@ DASHBOARD_PAGES = {
     "compare_rounds": ("trends", "Trends"), "profile_indicator": ("trends", "Trends"),
     "rank_regions": ("regions", "Regions"), "relate_indicators": ("regions", "Regions"),
     "get_assistance": ("assistance", "Assistance"), "get_costs": ("costs", "Costs"), "get_household_costs": ("costs", "Costs"),
+    "get_diet": ("merge", "Merge"),
     "trace_variable": ("crosswalk", "Crosswalk"), "compare_original": ("original", "Original vs merged"),
     "describe_variable": ("variables", "Variables"), "search_variables": ("variables", "Variables"),
     "get_merge_status": ("merge", "Merge"), "get_validation_checks": ("validation", "Validation"), "search_data_issues": ("issues", "Data issues"),
@@ -483,6 +484,35 @@ def get_household_costs(view: str = "by_round", round_id: str = "", keyword: str
     return _result(t, call, title, head)
 
 
+@beta_tool
+@_keep
+def get_diet(view: str = "indicators", round_id: str = "") -> str:
+    """Child and women's diet, 2021 Annual to 2023 Annual, from the person-level files that merge/26_WFP_Chad_link_diet.R
+    links to households (one row per child aged 6-23 months, one per woman aged 15-49; not merged into the household file).
+    Views: indicators (by round: minimum dietary diversity MDD, minimum meal frequency MMF and minimum acceptable diet
+    MAD of children, WHO 2021; minimum dietary diversity of women MDD-W, FAO 2021; % of the linked persons, unweighted),
+    link (by round: raw records, records linked to a household, households whose record count matches what they
+    reported, records left out, and the inflated row counts of the old Rmd 09 and 10 files).
+
+    Args:
+        view: indicators or link.
+        round_id: Optional round, e.g. "R10" or "2023 Annual".
+    """
+    call = _log("get_diet", view=view, round_id=round_id)
+    if view not in ("indicators", "link"):
+        return "view must be indicators or link."
+    t = _table("nutrition_indicators.csv" if view == "indicators" else "nutrition_rows.csv")
+    if rid := _round_ids(round_id):
+        t = t[t["round_id"].isin(rid)]
+    if t.empty:
+        return f"No diet data for '{round_id}': asked from the 2021 Annual (R06) to the 2023 Annual (R10) only."
+    t = _table("rounds.csv")[["round_id", "round", "series"]].merge(t, on="round_id")
+    head = ("# Linked by pairing each block of the repeat files with its survey form (merge/26). Unweighted shares of the linked "
+            "children or women; value in %. The 2023 Annual (one form) is the benchmark for the link: about 98% of its households "
+            "have as many records as they reported.\n")
+    return _result(t, call, "Diet indicators by round" if view == "indicators" else "Diet records linked to households", head)
+
+
 # ---- Merging process -----------------------------------------------------------------------------
 
 @beta_tool
@@ -666,7 +696,7 @@ def get_merge_status(module: str = "") -> str:
                 "columns_added", "rmd"]
         info = build_info()
         head = (f"# Merged file {info.get('merged_file')}: {info.get('households')} households, {info.get('columns')} columns. "
-                "Nutrition (MAD, MDD-W) is not merged: see search_data_issues('MAD').\n")
+                "Nutrition (MAD, MDD-W) is kept in two linked person-level files, not merged: see get_diet.\n")
         return _result(steps[cols].sort_values("merge_order"), call, "Merge steps", head)
     want = _plain(module)
     m = steps[(steps["module"].map(_plain) == want) | steps["label"].map(_plain).str.contains(want, regex=False)]
@@ -927,7 +957,7 @@ def build_info() -> dict:
 
 
 TOOLS = [list_indicators, list_rounds, get_indicator, profile_indicator, compare_rounds, rank_regions, relate_indicators,
-         get_assistance, get_costs, get_household_costs,
+         get_assistance, get_costs, get_household_costs, get_diet,
          trace_variable, compare_original, describe_variable, search_variables, get_merge_status, get_validation_checks, search_data_issues,
          search_documents, read_document,
          publish_result]

@@ -73,6 +73,7 @@ COPY = {
     "cost_ledger.csv": "cost_ledger.csv",
     "cost_template_vs_revised.csv": "cost_template_vs_revised.csv",
     "nutrition_rows.csv": "nutrition_rows.csv",
+    "nutrition_indicators.csv": "nutrition_indicators.csv",
     "ch_phase_by_round.csv": "ch_phase_by_round.csv",
 }
 # Rules of the cost process, from the merging repository's costs/ folder (parameters, no household data).

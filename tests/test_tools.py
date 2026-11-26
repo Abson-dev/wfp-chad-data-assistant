@@ -214,6 +214,16 @@ def test_search_falls_back_to_the_workbook(rows):
     assert "rounds_mapped" in t.columns or name in set(t["variable"])
 
 
+def test_diet_indicators_and_link(rows):
+    t, text = rows(tools.get_diet)
+    assert set(t["indicator"]) == {"MDD", "MMF", "MAD", "MDDW"} and set(t["round_id"]) <= {"R06", "R07", "R08", "R09", "R10"}
+    assert t["value"].between(0, 100).all() and "Unweighted" in text
+    k, _ = rows(tools.get_diet, view="link", round_id="R10")
+    assert set(k["round_id"]) == {"R10"} and (k["linked_rows"] <= k["raw_rows"]).all()
+    assert "asked from the 2021 Annual" in tools.get_diet.call({"round_id": "R01"})
+    assert "view must be" in tools.get_diet.call({"view": "zzz"})
+
+
 def test_merge_status_overall_and_by_module(rows):
     t, text = rows(tools.get_merge_status)
     assert t["merge_order"].is_monotonic_increasing and "households" in text and "Nutrition" in text
