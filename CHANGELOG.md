@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.3 (2026-11-27)
+
+- **Changed:** the tables follow the merged file v14, where do-file 29 keeps the labelled answers that the harmonisation had set to missing: the 2018 food source "Other" (code 11), the head's main activity "Pas autre" (15) and the 2019 to 2021 answers without a detailed category (16 to 19), and the raw 2021 Annual theft and death follow-ups (`*_raw`).
+
 ## 0.9.2 (2026-11-27)
 
 - **Changed:** the tables follow the merged file v13, where do-file 28 moves the nutrition awareness answers of the 2019 Annual, 2020 Annual and 2021 PDM from training and capacity building to community nutrition (FARN), without a FARN cost.

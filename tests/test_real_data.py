@@ -53,7 +53,7 @@ def test_original_against_merged_on_the_real_tables(rows):
 
 def test_the_dropped_workbook_variables_are_back_in_v10(rows):
     v = pd.read_csv(tools.DATA / "variables.csv")
-    assert len(v) == 769 and {"RESPAge", "RESPSex", "RESPConsent", "SCIEvolRessSociales", "DebutAssistance"} <= set(v["variable"])
+    assert len(v) == 773 and {"RESPAge", "RESPSex", "RESPConsent", "SCIEvolRessSociales", "DebutAssistance"} <= set(v["variable"])
     ov = pd.read_csv(tools.DATA / "original_vs_merged.csv")
     assert not (ov["status"] == "Not in the merged file").any()
     t, _ = rows(tools.compare_original, variable="MigrationEmploi")
@@ -65,8 +65,13 @@ def test_v11_restores_education_and_documents_every_missing_answer(rows):
     assert len(lost) and not lost["reason"].str.startswith("Not documented").any()
     assert not lost["variable"].isin(["HHHEdu", "HHSourceIncome"]).any()
     assert "HHHMainActivityGroup" in set(pd.read_csv(tools.DATA / "variables.csv")["variable"])
+    # v14 (do-file 29): only the four 2021 Annual shock follow-ups stay missing; their raw answers are kept as *_raw.
+    assert set(lost["variable"]) == {"ShkImpFood_Theft", "ShkRecNow_Theft", "ShkRec1y_Theft", "ShkRec1y_Death"}
+    assert lost["reason"].str.contains("_raw").all()
+    assert {"ShkImpFood_Theft_raw", "ShkRec1y_Death_raw"} <= set(pd.read_csv(tools.DATA / "variables.csv")["variable"])
     t, text = rows(tools.compare_original, variable="HHHMainActivity")
-    assert "HHHMainActivityGroup" in text
+    assert "HHHMainActivity" in text
+    assert "HHHMainActivityGroup" in (tools.AGENT_DIR / "wfp_agent" / "system_prompt.md").read_text(encoding="utf-8")
 
 
 def test_the_diet_records_are_linked_once(rows):
