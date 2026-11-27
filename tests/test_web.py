@@ -217,6 +217,11 @@ def test_error_messages(name, needle):
     assert needle in webapp.friendly_error(type(name, (Exception,), {})())
 
 
+def test_an_empty_credit_balance_is_named():
+    e = type("BadRequestError", (Exception,), {})("Error code: 400 - Your credit balance is too low to access the Anthropic API.")
+    assert "run out of credits" in webapp.friendly_error(e)
+
+
 def test_status_reports_what_is_missing(tmp_path):
     s = signed_in(tmp_path).get("/api/status").json()
     assert s["locked"] is False and "publish_result" in s["tools"] and s["data"]["rounds"] == 10

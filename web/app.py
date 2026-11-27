@@ -299,6 +299,9 @@ def friendly_error(e: Exception) -> str:
     name = type(e).__name__
     if name == "AuthenticationError" or "authentication" in str(e).lower():
         return "The Anthropic API key is missing or not valid. Set ANTHROPIC_API_KEY and restart."
+    if "credit balance" in str(e).lower():
+        return ("The Anthropic account has run out of credits. The administrator must add credits "
+                "(console.anthropic.com, Plans & Billing), then ask again.")
     if name == "RateLimitError":
         return "The API rate limit was reached. Try again in a minute."
     if name in ("APIConnectionError", "APITimeoutError"):

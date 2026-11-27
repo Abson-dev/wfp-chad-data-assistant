@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.2 (2026-11-27)
+
+- **Changed:** the tables follow the merged file v13, where do-file 28 moves the nutrition awareness answers of the 2019 Annual, 2020 Annual and 2021 PDM from training and capacity building to community nutrition (FARN), without a FARN cost.
+- **Changed:** when the Anthropic account has no credit left, the web app says so, instead of "The question failed (BadRequestError)".
+
 ## 0.9.1 (2026-11-26)
 
 - **Changed:** the tables follow the merged file v12, where do-file 27 corrects the label of `Montant` (the cash received at the last distribution, not an amount from the main income source); values unchanged.
