@@ -1,5 +1,7 @@
 """The read-only tools: the analysis, the merging process, and the command line. Run on the invented dashboard
 (demo/make_demo_data.py) unless WFP_TEST_REAL_DATA=1, so the tests below only use what both have in common."""
+import os
+
 import pandas as pd
 
 from wfp_agent import tools
@@ -28,9 +30,11 @@ def test_list_indicators_filters_by_domain():
 
 
 def test_indicator_gives_both_figures_and_the_flag(rows):
-    # Works on the invented data (2023 Annual flagged and corrected) and on the real data (fixed in v9).
+    # Works on the invented data (2023 Annual flagged and corrected) and on the real data, where no round of
+    # coping is flagged since v15 (do-file 30 settles the 2019 Annual).
     t, _ = rows(tools.get_indicator, indicator="lcs_em")
-    assert t["flagged"].any() and t.loc[t["flagged"], "flag_reason"].map(lambda s: isinstance(s, str)).all()
+    assert t["flagged"].any() or os.environ.get("WFP_TEST_REAL_DATA") == "1"
+    assert t.loc[t["flagged"], "flag_reason"].map(lambda s: isinstance(s, str)).all()
     differ = (t["as_merged"] - t["with_corrections"]).abs() > 1e-9
     assert t.loc[differ, "flagged"].all()
     one, _ = rows(tools.get_indicator, indicator="lcs_em", rounds="2023 Annual")

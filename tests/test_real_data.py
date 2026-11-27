@@ -30,7 +30,8 @@ def test_the_coping_defects_are_fixed_in_v9():
     ind = pd.read_csv(tools.DATA / "indicators.csv")
     em = ind.query("indicator == 'lcs_em' and breakdown == 'national'").set_index("round_id")
     assert (em.loc[["R01", "R03", "R10"], "as_merged"].round(1) == [21.2, 8.5, 5.8]).all()
-    assert not em.loc[["R01", "R03", "R10"], "flagged"].any() and em.loc["R02", "flagged"]
+    assert not em.loc[["R01", "R02", "R03", "R10"], "flagged"].any()
+    assert round(em.loc["R02", "as_merged"], 1) == 14.6  # do-file 30, v15
     abi = ind.query("indicator == 'abi_mean' and breakdown == 'national' and round_id == 'R08'").iloc[0]
     assert round(abi["as_merged"], 1) == 5.8 and not abi["flagged"]
 

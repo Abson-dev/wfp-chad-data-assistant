@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.4 (2026-11-27)
+
+- **Changed:** the tables follow the merged file v15, where do-file 30 reads the 2019 Annual coping answers on the scale of the analysts' variables (emergency coping 14.6%, not 23.6%); the round is no longer flagged.
+
 ## 0.9.3 (2026-11-27)
 
 - **Changed:** the tables follow the merged file v14, where do-file 29 keeps the labelled answers that the harmonisation had set to missing: the 2018 food source "Other" (code 11), the head's main activity "Pas autre" (15) and the 2019 to 2021 answers without a detailed category (16 to 19), and the raw 2021 Annual theft and death follow-ups (`*_raw`).
